@@ -21,6 +21,8 @@
   },
   "homepage": "https://github.com/nathaniel-may/example-dal#readme",
   "dependencies": {
-    "jasmine": "^2.8.0"
+    "jasmine": "^2.8.0",
+    "mongodb": "^2.2.33",
+    "winston": "^2.4.0"
   }
 }
