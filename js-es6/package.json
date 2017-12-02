@@ -1,0 +1,26 @@
+{
+  "name": "example-dal",
+  "version": "1.0.0",
+  "description": "an example database access layer for MongoDB",
+  "main": "index.js",
+  "engines": {
+    "node": "^9.2.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "jasmine"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nathaniel-may/example-dal.git"
+  },
+  "author": "Nathaniel May",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nathaniel-may/example-dal/issues"
+  },
+  "homepage": "https://github.com/nathaniel-may/example-dal#readme",
+  "dependencies": {
+    "jasmine": "^2.8.0"
+  }
+}
