@@ -1,3 +1,4 @@
+//Javascript
 *.log*
-node-modules/
-
+node_modules/
+package-lock.json
