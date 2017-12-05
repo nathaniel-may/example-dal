@@ -12,16 +12,16 @@ winston.remove(winston.transports.Console);
 winston.add(winston.transports.Console, {colorize: true});
 winston.level = 'silly';
 
-describe('TraceLogger', function() {
+describe('MongoDal', () => {
 
   let logModule = 'JAS DAL';
 
-  beforeAll(function(done){
+  beforeAll((done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---beforeAll started---');
 
-    //create TraceLogger
+    //create MongoDal
     try{
-      this.dal = new MongoDal('localhost:27017');
+      dal = new MongoDal('mongodb://localhost:27017');
     }
     catch(err){
       winston.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
@@ -31,49 +31,63 @@ describe('TraceLogger', function() {
 
     //setup the logger
     dal.init()
-    .then(function(){
+    .then(() => {
       winston.debug(new Date() + ' ' + logModule + ' dal init completed');
       winston.debug(new Date() + ' ' + logModule + ' ---beforeAll completed---\n');
       done();
     })
-    .catch(function(err){
-      winston.error(new Date() + ' ' + logModule + ' error attempting to init trace logger: ' + err);
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error attempting to init MongoDal: ' + err);
       done();
     });
 
   });
 
-  it('gets document by id', function(done) {
-    winston.debug(new Date() + ' ' + logModule + ' ---generates a trace id---');
-    dal.getById()
-    .then(function(id){
+  it('inserts one doc', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---');
+    let doc = {
+      string: 'string value',
+      num: 10,
+      array: [1, 2, 3],
+      subDoc: {string1: 'str1', str2: 'str2'}
+    };
+    dal.insertDoc(doc).then((id) => {
       winston.debug(new Date() + ' ' + logModule + ' got id: ' + id);
-      if(id instanceof ObjectId){
-        return id;
-      }
-      else{
-        throw new Error(id + 'is not an instanceof ObjectId');
-      }
-    })
-    .catch(function(err){
-      winston.error(new Date() + ' ' + logModule + ' error getting trace id: ' + err);
-      fail(err); 
-    })
-    .then(function(){
-      winston.debug(new Date() + ' ' + logModule + ' ---generates a trace id---\n');
+      expect(id instanceof ObjectId).toBe(true);
+      winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
       done();
-    });
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
+      fail(err); 
+      done();
+    })
   });
 
-  afterEach(function(done){
+  it('gets document by id', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---');
+    dal.getById().then((id) => {
+      winston.debug(new Date() + ' ' + logModule + ' got id: ' + id);
+      expect(id instanceof ObjectId).toBe(true);
+      winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---\n');
+      done();
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error getting document: ' + err);
+      fail(err); 
+      done();
+    })
+  });
+
+  afterEach((done) => {
     winston.silly(new Date() + ' ' + logModule + ' ---after each---');
-    logger.deleteAllLogs()
-    .then(function(count){
-      winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing logs.');
+    mongoDal.deleteAllDocs()
+    .then((count) => {
+      winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
       winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
       done();
     })
-    .catch(function(err){
+    .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error deleting all logs in afterEach: ' + err + '\n');
       fail(err);
       done();
