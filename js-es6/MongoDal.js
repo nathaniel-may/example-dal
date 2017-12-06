@@ -29,10 +29,7 @@ class MongoDal{
   init(){
     return new Promise((resolve, reject) => {
       logger.debug(new Date() + ' ' + this.logModule + ' init() function called');
-
-      logger.debug(new Date() + ' ' + this.logModule + ' attempting mongodb connection with conn string ' + this.connString);
-      this._connect('dal')
-      .then((db) => {
+      this._connect('dal').then((db) => {
         //define database object
         this._database = db;
 
@@ -52,8 +49,7 @@ class MongoDal{
     logger.debug(new Date() + ' ' + this.logModule + ' _connect function called for database ' + dbName + '.');
     return new Promise((resolve, reject) => {
       logger.debug(new Date() + ' ' + this.logModule + ' attempting mongodb connection with conn string ' + this.connString);
-      MongoClient.connect(this.connString)
-      .then((db) => {
+      MongoClient.connect(this.connString).then((db) => {
         logger.debug(new Date() + ' ' + this.logModule + ' MongoClient success');
         resolve(db);
       })
@@ -75,13 +71,23 @@ class MongoDal{
       }
 
       let fn = () => {
-        return this.dalExample.insert(doc).comment('insertDoc from ' + this.logModule);
-      }
+        return new Promise(() => {
+          this.dalExample.insertOne(doc).then(() => { //TODO add $comment
+            resolve(doc._id);
+          }) 
+          .catch((err) => {
+            reject(err);
+          })
+        })
+      };
       this._retryOnErr(fn).then((res) => {
+        //TODO do something with res like return id
         logger.debug(new Date() + ' ' + this.logModule + ' document successfully inserted');
+        resolve(res);
       })
       .catch((err) => {
         logger.error(new Date() + ' ' + this.logModule + ' error inserting doc: ' + err);
+        reject(err);
       })
     });
   };
@@ -92,43 +98,24 @@ class MongoDal{
       logger.debug(new Date() + ' ' + this.logModule + ' about to call find on debts');
 
       let fn = () => {
-        return this.dalExample.find({_id: id}).comment('getById from ' + this.logModule).toArray();
+        return new Promise(() => {
+          this.dalExample.findOne({_id: id}).then((doc) => { //TODO add $comment
+            resolve(doc);
+          }) 
+          .catch((err) => {
+            reject(err);
+          })
+        })
       };
-      return this._retryOnErr(fn).then((array) => {
+
+      this._retryOnErr(fn).then((doc) => {
         logger.debug(new Date() + ' ' + this.logModule + ' found ' + array.length + ' docs');
-        resolve(array[0]);
+        resolve(doc);
       })
       .catch((err) => {
         logger.error(new Date() + ' ' + this.logModule + ' error getting all current debts');
         reject(err);
       });
-    });
-  };
-
-  getAllRecentDocuments(sinceDate){
-    return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' getAllRecentDebts function called');
-      logger.debug(new Date() + ' ' + this.logModule + ' about to call find on debts');
-
-      let fn = () => {
-        return debtsCol.find({date: {$gte: sinceDate}})
-        .comment('getAllrecentDocs from ' + this.logModule).toArray(); //TODO array pulls them all into memory. Add cursor functions
-      };
-      this._retryOnErr(fn)
-      .then((array) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' found ' + array.length + ' docs');
-        resolve(array);
-      })
-      .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error getting all current debts');
-        reject(err);
-      });
-    });
-  };
-
-  newFunction(param){
-    return new Promise((resolve, reject) => {
-      reject(new Error('function not defined yet'));
     });
   };
 

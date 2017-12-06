@@ -66,33 +66,45 @@ describe('MongoDal', () => {
 
   it('gets document by id', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---');
-    dal.getById().then((id) => {
-      winston.debug(new Date() + ' ' + logModule + ' got id: ' + id);
-      expect(id instanceof ObjectId).toBe(true);
-      winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---\n');
+    let doc = {
+      string: 'string value',
+      num: 99,
+      array: [1, 2, 3],
+      subDoc: {string1: 'str1', str2: 'str2'}
+    };
+    let _id;
+    dal.insertDoc(doc).then((id) => {
+      winston.debug(new Date() + ' ' + logModule + ' inserted doc.');
+      _id = id;
+      return dal.getById(id);
+    })
+    .then((doc) => {
+      expect(doc._id).toEqual(_id);
+      expect(doc.num).toEqual(99);
+      winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
       done();
     })
     .catch((err) => {
-      winston.error(new Date() + ' ' + logModule + ' error getting document: ' + err);
+      winston.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
       fail(err); 
       done();
     })
   });
 
-  afterEach((done) => {
-    winston.silly(new Date() + ' ' + logModule + ' ---after each---');
-    mongoDal.deleteAllDocs()
-    .then((count) => {
-      winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
-      winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
-      done();
-    })
-    .catch((err) => {
-      winston.error(new Date() + ' ' + logModule + ' error deleting all logs in afterEach: ' + err + '\n');
-      fail(err);
-      done();
-    });
+  // afterEach((done) => {
+  //   winston.silly(new Date() + ' ' + logModule + ' ---after each---');
+  //   mongoDal.deleteAllDocs()
+  //   .then((count) => {
+  //     winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
+  //     winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
+  //     done();
+  //   })
+  //   .catch((err) => {
+  //     winston.error(new Date() + ' ' + logModule + ' error deleting all logs in afterEach: ' + err + '\n');
+  //     fail(err);
+  //     done();
+  //   });
     
-  });
+  // });
 
 });
