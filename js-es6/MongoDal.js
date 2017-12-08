@@ -1,5 +1,4 @@
-//example data access layer for MongoDB 3.4
-//with full idempotency for safe retry strategy
+//fully idempotent example database access layer for MongoDB 3.4
 
 //load dependencies
 var MongoClient = require('mongodb').MongoClient;
@@ -8,7 +7,7 @@ var logger = require('winston');
 
 //TODO LIST
 // - timeouts
-// - 
+// - query comments
 
 class MongoDal{
 
@@ -28,7 +27,7 @@ class MongoDal{
 
   init(){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' init() function called');
+      logger.debug(new Date() + ' ' + this.logModule + ' init function called');
       this._connect('dal').then((db) => {
         //define database object
         this._database = db;
@@ -37,6 +36,7 @@ class MongoDal{
         this.dalExample = db.collection('example');
 
         resolve();
+        logger.debug(new Date() + ' ' + this.logModule + ' init function completed');
       })
       .catch((err) => {
         logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
@@ -51,7 +51,7 @@ class MongoDal{
       logger.debug(new Date() + ' ' + this.logModule + ' attempting mongodb connection with conn string ' + this.connString);
       MongoClient.connect(this.connString).then((db) => {
         logger.debug(new Date() + ' ' + this.logModule + ' MongoClient success');
-        resolve(db);
+        resolve(db.db(dbName));
       })
       .catch((err) => {
         logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
@@ -60,9 +60,13 @@ class MongoDal{
     });
   }
 
-  insertDoc(doc){
+  insertDoc(docIn){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called');
+      logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called with doc ' + JSON.stringify(docIn));
+
+      //creating a deep copy to avoid modifying in the previous scope
+      //note that Date() objects become type ISODate which is OK for MongoDB
+      let doc = JSON.parse(JSON.stringify(docIn));
 
       //assigning an id allows for safe retries of inserts
       //the duplicate key exception prevents multiple inserts
@@ -74,7 +78,7 @@ class MongoDal{
         return new Promise(() => {
           this.dalExample.insertOne(doc).then(() => { //TODO add $comment
             resolve(doc._id);
-          }) 
+          })
           .catch((err) => {
             reject(err);
           })
@@ -94,8 +98,7 @@ class MongoDal{
 
   getById(id){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' getAllCurrentDebts function called');
-      logger.debug(new Date() + ' ' + this.logModule + ' about to call find on debts');
+      logger.debug(new Date() + ' ' + this.logModule + ' getById function called');
 
       let fn = () => {
         return new Promise(() => {
@@ -113,7 +116,7 @@ class MongoDal{
         resolve(doc);
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error getting all current debts');
+        logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
         reject(err);
       });
     });
@@ -121,8 +124,7 @@ class MongoDal{
 
   _retryOnErr(fn){
     return new Promise((resolve, reject) => {
-      fn()
-      .then((res) => {
+      fn().then((res) => {
         resolve(res);
       })
       .catch((err) => { //TODO catch correctly
@@ -133,8 +135,7 @@ class MongoDal{
           logger.warn(new Date() + ' ' + this.logModule + ' experienced error- retrying');
           return fn();
         }
-      })
-      .then((res) => {
+      }).then((res) => {
         resolve(res);
       })
       .catch((err) => {
@@ -147,4 +148,3 @@ class MongoDal{
 }
 
 module.exports = MongoDal;
-

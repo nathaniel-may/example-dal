@@ -16,6 +16,14 @@ describe('MongoDal', () => {
 
   let logModule = 'JAS DAL';
 
+  //test documents
+  let testDoc = {
+      string: 'string value',
+      num: 99,
+      array: [1, 2, 3],
+      subDoc: {string1: 'str1', str2: 'str2'}
+    };
+
   beforeAll((done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---beforeAll started---');
 
@@ -45,13 +53,7 @@ describe('MongoDal', () => {
 
   it('inserts one doc', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---');
-    let doc = {
-      string: 'string value',
-      num: 10,
-      array: [1, 2, 3],
-      subDoc: {string1: 'str1', str2: 'str2'}
-    };
-    dal.insertDoc(doc).then((id) => {
+    dal.insertDoc(testDoc).then((id) => {
       winston.debug(new Date() + ' ' + logModule + ' got id: ' + id);
       expect(id instanceof ObjectId).toBe(true);
       winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
@@ -66,14 +68,8 @@ describe('MongoDal', () => {
 
   it('gets document by id', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---');
-    let doc = {
-      string: 'string value',
-      num: 99,
-      array: [1, 2, 3],
-      subDoc: {string1: 'str1', str2: 'str2'}
-    };
     let _id;
-    dal.insertDoc(doc).then((id) => {
+    dal.insertDoc(testDoc).then((id) => {
       winston.debug(new Date() + ' ' + logModule + ' inserted doc.');
       _id = id;
       return dal.getById(id);
@@ -89,6 +85,24 @@ describe('MongoDal', () => {
       fail(err); 
       done();
     })
+  });
+
+  xit('retries and eats duplicate key error on insert retry', (done) => {
+    fail(new Error('test not completed'));
+    done();
+  });
+
+  xit('fails without retrying on cant $divide by zero error', (done) => {
+    fail(new Error('test not completed'));
+    done();
+  });
+
+  xit('deletes all docs', (done) => {
+
+
+
+    fail(new Error('test not completed'));
+    done();
   });
 
   // afterEach((done) => {
