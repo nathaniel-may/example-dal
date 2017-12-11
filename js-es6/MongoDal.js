@@ -122,6 +122,36 @@ class MongoDal{
     });
   };
 
+  countCol(){
+    let fn = () => {
+      return this.dalExample.count(); //TODO add $comment
+    };
+
+    this._retryOnErr(fn).then((count) => {
+      logger.debug(new Date() + ' ' + this.logModule + ' collection count is ' + count);
+      resolve(count);
+    })
+    .catch((err) => {
+      logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
+      reject(err);
+    });
+  }
+
+  deleteAllDocs(){
+    let fn = () => {
+      return this.dalExample.deleteMany({}); //TODO add $comment
+    };
+
+    this._retryOnErr(fn).then(() => {
+      logger.debug(new Date() + ' ' + this.logModule + ' found ' + array.length + ' docs');
+      resolve();
+    })
+    .catch((err) => {
+      logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
+      reject(err);
+    });
+  }
+
   _retryOnErr(fn){
     return new Promise((resolve, reject) => {
       fn().then((res) => {
