@@ -114,6 +114,15 @@ describe('MongoDal', () => {
     })
     .then((count) => {
       winston.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs');
+      expect(count).toBe(3);
+      return dal.deleteAllDocs();
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' all docs successfully deleted');
+      return dal.countCol();
+    })
+    .then((count) => {
+      winston.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs after delete');
       expect(count).toBe(0);
       winston.debug(new Date() + ' ' + logModule + ' ---deletes all docs---\n');
       done();
@@ -125,20 +134,20 @@ describe('MongoDal', () => {
     });
   });
 
-  // afterEach((done) => {
-  //   winston.silly(new Date() + ' ' + logModule + ' ---after each---');
-  //   mongoDal.deleteAllDocs()
-  //   .then((count) => {
-  //     winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
-  //     winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
-  //     done();
-  //   })
-  //   .catch((err) => {
-  //     winston.error(new Date() + ' ' + logModule + ' error deleting all logs in afterEach: ' + err + '\n');
-  //     fail(err);
-  //     done();
-  //   });
+  afterEach((done) => {
+    winston.silly(new Date() + ' ' + logModule + ' ---after each---');
+    dal.deleteAllDocs()
+    .then((count) => {
+      winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
+      winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
+      done();
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error deleting all docs in afterEach: ' + err);
+      fail(err);
+      done();
+    });
     
-  // });
+  });
 
 });

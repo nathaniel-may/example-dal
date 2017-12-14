@@ -98,7 +98,7 @@ class MongoDal{
 
   getById(id){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' getById function called');
+      logger.debug(new Date() + ' ' + this.logModule + ' getById function called with id ' + id);
 
       let fn = () => {
         return new Promise(() => {
@@ -112,7 +112,7 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then((doc) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' found ' + array.length + ' docs');
+        logger.debug(new Date() + ' ' + this.logModule + ' found doc with id ' + id);
         resolve(doc);
       })
       .catch((err) => {
@@ -146,7 +146,7 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then(() => {
-        logger.debug(new Date() + ' ' + this.logModule + ' found ' + array.length + ' docs');
+        logger.debug(new Date() + ' ' + this.logModule + ' deleted all docs');
         resolve();
       })
       .catch((err) => {
