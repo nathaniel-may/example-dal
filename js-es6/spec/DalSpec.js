@@ -151,6 +151,49 @@ describe('MongoDal', () => {
     });
   });
 
+  it('should retry on error', function(done) {
+    winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---');
+
+    class CallTracker{
+
+      constructor(){
+        this.called = 0;
+      }
+
+      errOnFirstCall(){
+        this.called++;
+        return new Promise((resolve, reject) => {
+          if(this.called == 1){
+            reject(new Error('I always reject the first call'));
+          }
+          else{
+            resolve('success');
+          }
+        });
+      }
+      
+    };
+
+    let callTracker = new CallTracker();
+    winston.silly(new Date() + ' ' + logModule + ' created callTracker obj');
+    spyOn(callTracker, 'errOnFirstCall').and.callThrough();
+    let fn = function(){ return callTracker.errOnFirstCall(); };
+
+    dal._retryOnErr(fn)
+    .then(function(res){
+      expect(callTracker.errOnFirstCall).toHaveBeenCalledTimes(2);
+      expect(res).toBe('success');
+    })
+    .catch(function(err){
+      winston.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err + '\n');
+      fail(err);
+    })
+    .then(function(){
+      winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---\n');
+      done();
+    });
+  });
+
   afterEach((done) => {
     winston.silly(new Date() + ' ' + logModule + ' ---after each---');
     dal.deleteAllDocs()
