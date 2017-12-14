@@ -97,10 +97,27 @@ describe('MongoDal', () => {
     done();
   });
 
-  xit('counts the number of documents in the collection', (done) => {
-    //TODO expect zero at the beginning, then two or so after.
-    fail(new Error('test not completed'));
-    done();
+  it('counts the collection', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---counts the collection---');
+    dal.countCol().then((count) => {
+      expect(count).toBe(0);
+      return Promise.all([dal.insertDoc({test:0}),
+                          dal.insertDoc({test:1}),
+                          dal.insertDoc({test:2})]);
+    }).then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' inserted all 3 docs');
+      return dal.countCol();
+    }).then((count) => {
+      winston.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs');
+      expect(count).toBe(3);
+      winston.debug(new Date() + ' ' + logModule + ' ---counts the collection---\n');
+      done();
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error counting the collection: ' + err);
+      fail(err); 
+      done();
+    });
   });
 
   it('deletes all docs', (done) => {
