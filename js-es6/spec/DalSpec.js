@@ -264,6 +264,39 @@ describe('MongoDal', () => {
     });
   });
 
+  it('increments a counter', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---increments a counter---');
+    let doc = {};
+    doc.counter = 0;
+
+    dal.insertDoc(doc).then((id) => {
+      winston.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      doc._id = id;
+      return dal.incCounter(id);
+    })
+    .then((count) => {
+      winston.debug(new Date() + ' ' + logModule + ' incCounter reports a new count of ' + count);
+      expect(count).toBe(1);
+      return dal.getById(doc._id);
+    })
+    .then((doc) => {
+      winston.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      expect(doc.counter).toBe(1);
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error testing incCounter: ' + err);
+      fail();
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---increments a counter---\n');
+      done();
+    });
+  });
+
+  xit('doesnt double count after network error', (done) => {
+
+  });
+
   afterEach((done) => {
     winston.silly(new Date() + ' ' + logModule + ' ---after each---');
     dal.deleteAllDocs()
