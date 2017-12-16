@@ -5,10 +5,6 @@ var MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
 var logger = require('winston');
 
-//TODO LIST
-// - timeouts
-// - query comments
-
 class MongoDal{
 
   constructor(connString){
@@ -76,7 +72,7 @@ class MongoDal{
 
       let fn = () => {
         return new Promise(() => {
-          this.dalExample.insertOne(doc).then(() => { //TODO add $comment
+          this.dalExample.insertOne(doc).then(() => {
             resolve(doc._id);
           })
           .catch((err) => {
@@ -101,14 +97,7 @@ class MongoDal{
       logger.debug(new Date() + ' ' + this.logModule + ' getById function called with id ' + id);
 
       let fn = () => {
-        return new Promise(() => {
-          this.dalExample.findOne({_id: id}).then((doc) => { //TODO add $comment
-            resolve(doc);
-          }) 
-          .catch((err) => {
-            reject(err);
-          })
-        })
+        return this.dalExample.find({_id: id}).comment('getById from MongoDal.js').next();
       };
 
       this._retryOnErr(fn).then((doc) => {
@@ -125,7 +114,7 @@ class MongoDal{
   countCol(){
     return new Promise((resolve, reject) => {
       let fn = () => {
-        return this.dalExample.count({}); //TODO add $comment
+        return this.dalExample.find({}).comment('countCol from MongoDal.js').count();
       };
 
       this._retryOnErr(fn).then((count) => {
@@ -142,7 +131,7 @@ class MongoDal{
   deleteAllDocs(){
     return new Promise((resolve, reject) => {
       let fn = () => {
-        return this.dalExample.deleteMany({}); //TODO add $comment
+        return this.dalExample.deleteMany({});
       };
 
       this._retryOnErr(fn).then(() => {
