@@ -36,6 +36,26 @@ class CallTracker{
     });
   }
 
+  netErrThenDupKey(){
+    this.called++;
+    return new Promise((resolve, reject) => {
+      let netErr = new MongoError();
+      netErr.name = 'NetworkError'; //TODO: is this how the NetworkError group is denoted?
+
+      let dupKeyErr = new MongoError();
+      dupKeyErr.code = 11000;
+
+      //network error on first call
+      if(this.called == 1){
+        reject(netErr);
+      }
+      //duplicate key err on subsequent calls
+      else{
+        reject(dupKeyErr);
+      }
+    });
+  }
+
   dupKeyErr(){
     return new Promise((resolve, reject) => {
       let err = new MongoError();
@@ -222,14 +242,26 @@ describe('MongoDal', () => {
     });
   });
 
-  xit('retries and eats duplicate key error on insert retry', (done) => {
-    fail(new Error('test not completed'));
-    done();
-  });
+  it('retries and eats duplicate key error on insert retry', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---retries and eats duplicate key error on insert retry---');
 
-  xit('fails without retrying on cant $divide by zero error', (done) => {
-    fail(new Error('test not completed'));
-    done();
+    let callTracker = new CallTracker();
+    spyOn(callTracker, 'netErrThenDupKey').and.callThrough();
+    winston.debug(new Date() + ' ' + logModule + ' created call tracker');
+
+    dal._retryOnErr(() => {return callTracker.netErrThenDupKey();})
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' no error');
+      expect(callTracker.netErrThenDupKey).toHaveBeenCalledTimes(2);
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' error retrying: ' + err);
+      fail();
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---\n');
+      done();
+    });
   });
 
   afterEach((done) => {
