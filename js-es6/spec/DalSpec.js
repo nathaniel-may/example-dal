@@ -19,14 +19,19 @@ class CallTracker{
     this.called = 0;
   }
 
-  errOnFirstCall(){
+  netErr(){
     this.called++;
     return new Promise((resolve, reject) => {
+      let err = new MongoError();
+      err.name = 'NetworkError'; //TODO: is this how the NetworkError group is denoted?
+
+      //network error on first call
       if(this.called == 1){
-        reject(new Error('I always reject the first call'));
+        reject(err);
       }
+      //no error on subsequent calls
       else{
-        resolve('I resolve after the first call');
+        resolve('resolved');
       }
     });
   }
@@ -177,23 +182,23 @@ describe('MongoDal', () => {
     });
   });
 
-  it('should retry on error', (done) => {
+  it('should retry on network error', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---');
 
     let callTracker = new CallTracker();
     winston.silly(new Date() + ' ' + logModule + ' created callTracker obj');
-    spyOn(callTracker, 'errOnFirstCall').and.callThrough();
+    spyOn(callTracker, 'netErr').and.callThrough();
 
-    dal._retryOnErr(callTracker.errOnFirstCall()).then((res) => {
-      expect(callTracker.errOnFirstCall).toHaveBeenCalledTimes(2);
-      expect(res).toBe('I resolve after the first call');
+    dal._retryOnErr(() => {return callTracker.netErr();}).then((res) => {
+      expect(callTracker.netErr).toHaveBeenCalledTimes(2);
+      expect(res).toBe('resolved');
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err);
       fail(err);
     })
     .then(() => {
-      winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---\n');
+      winston.debug(new Date() + ' ' + logModule + ' ---should retry on network error---\n');
       done();
     });
   });
@@ -205,7 +210,7 @@ describe('MongoDal', () => {
     spyOn(callTracker, 'dupKeyErr').and.callThrough();
     winston.debug(new Date() + ' ' + logModule + ' created call tracker');
 
-    dal._retryOnErr(callTracker.dupKeyErr())
+    dal._retryOnErr(() => {return callTracker.dupKeyErr();})
     .catch((err) => {
       winston.debug(new Date() + ' ' + logModule + ' caught error' + err);
       expect(err.code).toBe(11000); //expect the duplicate key error

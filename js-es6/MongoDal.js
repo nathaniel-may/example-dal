@@ -157,48 +157,37 @@ class MongoDal{
   }
 
   _retryOnErr(fn){
-    return this._retryOnErrTail(fn, 0);
-  };
-
-  _retryOnErrTail(fn, calls, err){
     return new Promise((resolve, reject) => {
-      if(calls == 0){
-        fn().then((res) => {
-          resolve(res);
-        })
-        .catch((err) => {
-          this._retryOnErrTail(fn, 1);
-        })
-      }
-      else if(calls == 1){
+      fn().then((res) => {
+        resolve(res);
+      })
+      .catch((err) => {
         if(err.name == 'NetworkError' || err.name == 'Interruption'){
           logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
-          fn().then(() => {
-            logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
-            resolve(res);
-          })
-          .catch((err) => {
-            //eats duplicate key during retry
-            if(err.code == 11000){
-              logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
-              resolve();
-            }
-            else{
-              logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
-              reject(new Error('Database Unavailable'));
-            }
-          })
+          return fn();
         }
         //the error is not retryable
         else{
           reject(err);
         }
-      }
-      else if(calls > 1){
-        reject(new Error('_retryOnErrTail called too many times'))
-      }
+      })
+      .then((res) => {
+        logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+        resolve(res);
+      })
+      .catch((err) => {
+        //eats duplicate key during retry
+        if(err.code == 11000){
+          logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+          resolve();
+        }
+        else{
+          logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
+          reject(new Error('Database Unavailable'));
+        }
+      })
     });
-  };
+  }
 
 }
 
