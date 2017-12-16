@@ -38,14 +38,15 @@ describe('MongoDal', () => {
     }
 
     //setup the logger
-    dal.init()
-    .then(() => {
+    dal.init().then(() => {
       winston.debug(new Date() + ' ' + logModule + ' dal init completed');
-      winston.debug(new Date() + ' ' + logModule + ' ---beforeAll completed---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error attempting to init MongoDal: ' + err);
+      fail();
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---beforeAll completed---\n');
       done();
     });
 
@@ -56,14 +57,15 @@ describe('MongoDal', () => {
     dal.insertDoc(testDoc).then((id) => {
       winston.debug(new Date() + ' ' + logModule + ' got id: ' + id);
       expect(id instanceof ObjectId).toBe(true);
-      winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
       fail(err); 
-      done();
     })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
+      done();
+    });
   });
 
   it('gets document by id', (done) => {
@@ -77,24 +79,15 @@ describe('MongoDal', () => {
     .then((doc) => {
       expect(doc._id).toEqual(_id);
       expect(doc.num).toEqual(99);
-      winston.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
       fail(err); 
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---gets document by id---\n');
       done();
     })
-  });
-
-  xit('retries and eats duplicate key error on insert retry', (done) => {
-    fail(new Error('test not completed'));
-    done();
-  });
-
-  xit('fails without retrying on cant $divide by zero error', (done) => {
-    fail(new Error('test not completed'));
-    done();
   });
 
   it('counts the collection', (done) => {
@@ -104,18 +97,21 @@ describe('MongoDal', () => {
       return Promise.all([dal.insertDoc({test:0}),
                           dal.insertDoc({test:1}),
                           dal.insertDoc({test:2})]);
-    }).then(() => {
+    })
+    .then(() => {
       winston.debug(new Date() + ' ' + logModule + ' inserted all 3 docs');
       return dal.countCol();
-    }).then((count) => {
+    })
+    .then((count) => {
       winston.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs');
       expect(count).toBe(3);
-      winston.debug(new Date() + ' ' + logModule + ' ---counts the collection---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error counting the collection: ' + err);
       fail(err); 
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---counts the collection---\n');
       done();
     });
   });
@@ -141,12 +137,13 @@ describe('MongoDal', () => {
     .then((count) => {
       winston.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs after delete');
       expect(count).toBe(0);
-      winston.debug(new Date() + ' ' + logModule + ' ---deletes all docs---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error deleting all docs and counting them: ' + err);
       fail(err); 
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---deletes all docs---\n');
       done();
     });
   });
@@ -167,7 +164,7 @@ describe('MongoDal', () => {
             reject(new Error('I always reject the first call'));
           }
           else{
-            resolve('success');
+            resolve('I resolve after the first call');
           }
         });
       }
@@ -179,13 +176,12 @@ describe('MongoDal', () => {
     spyOn(callTracker, 'errOnFirstCall').and.callThrough();
     let fn = function(){ return callTracker.errOnFirstCall(); };
 
-    dal._retryOnErr(fn)
-    .then(function(res){
+    dal._retryOnErr(fn).then(function(res){
       expect(callTracker.errOnFirstCall).toHaveBeenCalledTimes(2);
-      expect(res).toBe('success');
+      expect(res).toBe('I resolve after the first call');
     })
     .catch(function(err){
-      winston.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err + '\n');
+      winston.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err);
       fail(err);
     })
     .then(function(){
@@ -194,17 +190,54 @@ describe('MongoDal', () => {
     });
   });
 
+  it('does not retry on first duplicate key error', (done) => {
+    winston.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---');
+    let doc = {};
+    doc['_id'] = dal.genId();
+
+    let fn = dal.insertDoc(doc).then((id) => {
+      spyOn(dal, '_retryOnErr').and.callThrough();
+      return dal.insertDoc(doc);
+    })
+    .catch((err) => {
+      expect(err.code).toBe(11000); //expect the duplicate key error
+    })
+    .then((id) => {
+      expect(dal._retryOnErr).toHaveBeenCalledTimes(1);
+    })
+    .catch((err) => {
+      winston.error(new Date() + ' ' + logModule + ' problem with inserting a doc with a dup key.' + err);
+      fail(err);
+    })
+    .then(() => {
+      winston.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---\n');
+      done();
+    });
+  });
+
+  xit('retries and eats duplicate key error on insert retry', (done) => {
+    fail(new Error('test not completed'));
+    done();
+  });
+
+  xit('fails without retrying on cant $divide by zero error', (done) => {
+    fail(new Error('test not completed'));
+    done();
+  });
+
   afterEach((done) => {
     winston.silly(new Date() + ' ' + logModule + ' ---after each---');
     dal.deleteAllDocs()
     .then((count) => {
       winston.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
-      winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
-      done();
     })
     .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' error deleting all docs in afterEach: ' + err);
       fail(err);
+      done();
+    })
+    .then(() => {
+      winston.silly(new Date() + ' ' + logModule + ' ---after each---\n');
       done();
     });
     

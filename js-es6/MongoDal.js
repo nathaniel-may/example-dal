@@ -156,6 +156,12 @@ class MongoDal{
     });
   }
 
+  genId(){
+    return new Promise((resolve, reject) => {
+      resolve(new ObjectId());
+    })
+  }
+
   _retryOnErr(fn){
     return new Promise((resolve, reject) => {
       fn().then((res) => {
