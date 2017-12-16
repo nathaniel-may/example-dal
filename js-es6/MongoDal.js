@@ -84,10 +84,10 @@ class MongoDal{
           })
         })
       };
+
       this._retryOnErr(fn).then((res) => {
-        //TODO do something with res like return id
         logger.debug(new Date() + ' ' + this.logModule + ' document successfully inserted');
-        resolve(res);
+        resolve(doc._id);
       })
       .catch((err) => {
         logger.error(new Date() + ' ' + this.logModule + ' error inserting doc: ' + err);
@@ -156,32 +156,47 @@ class MongoDal{
     });
   }
 
-  genId(){
-    return new Promise((resolve, reject) => {
-      resolve(new ObjectId());
-    })
-  }
-
   _retryOnErr(fn){
+    return this._retryOnErrTail(fn, 0);
+  };
+
+  _retryOnErrTail(fn, calls, err){
     return new Promise((resolve, reject) => {
-      fn().then((res) => {
-        resolve(res);
-      })
-      .catch((err) => { //TODO catch correctly
-        if(err.message.includes('duplicate key error')){
-          resolve(new message('ate the duplicate key error'));
+      if(calls == 0){
+        fn().then((res) => {
+          resolve(res);
+        })
+        .catch((err) => {
+          this._retryOnErrTail(fn, 1);
+        })
+      }
+      else if(calls == 1){
+        if(err.name == 'NetworkError' || err.name == 'Interruption'){
+          logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
+          fn().then(() => {
+            logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+            resolve(res);
+          })
+          .catch((err) => {
+            //eats duplicate key during retry
+            if(err.code == 11000){
+              logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+              resolve();
+            }
+            else{
+              logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
+              reject(new Error('Database Unavailable'));
+            }
+          })
         }
+        //the error is not retryable
         else{
-          logger.warn(new Date() + ' ' + this.logModule + ' experienced error- retrying');
-          return fn();
+          reject(err);
         }
-      }).then((res) => {
-        resolve(res);
-      })
-      .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
-        reject(err);
-      }); 
+      }
+      else if(calls > 1){
+        reject(new Error('_retryOnErrTail called too many times'))
+      }
     });
   };
 

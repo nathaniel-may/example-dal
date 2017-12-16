@@ -1,6 +1,7 @@
 //load dependencies
 var winston = require('winston');
 var ObjectId = require('mongodb').ObjectId;
+var MongoError = require('mongodb').MongoError;
 var MongoDal = require('../MongoDal');
 
 //define variables
@@ -11,6 +12,34 @@ var dal;
 winston.remove(winston.transports.Console);
 winston.add(winston.transports.Console, {colorize: true});
 winston.level = 'silly';
+
+class CallTracker{
+
+  constructor(){
+    this.called = 0;
+  }
+
+  errOnFirstCall(){
+    this.called++;
+    return new Promise((resolve, reject) => {
+      if(this.called == 1){
+        reject(new Error('I always reject the first call'));
+      }
+      else{
+        resolve('I resolve after the first call');
+      }
+    });
+  }
+
+  dupKeyErr(){
+    return new Promise((resolve, reject) => {
+      let err = new MongoError();
+      err.code = 11000;
+      reject(err);
+    })
+  }
+  
+};
 
 describe('MongoDal', () => {
 
@@ -148,43 +177,22 @@ describe('MongoDal', () => {
     });
   });
 
-  it('should retry on error', function(done) {
+  it('should retry on error', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---');
-
-    class CallTracker{
-
-      constructor(){
-        this.called = 0;
-      }
-
-      errOnFirstCall(){
-        this.called++;
-        return new Promise((resolve, reject) => {
-          if(this.called == 1){
-            reject(new Error('I always reject the first call'));
-          }
-          else{
-            resolve('I resolve after the first call');
-          }
-        });
-      }
-      
-    };
 
     let callTracker = new CallTracker();
     winston.silly(new Date() + ' ' + logModule + ' created callTracker obj');
     spyOn(callTracker, 'errOnFirstCall').and.callThrough();
-    let fn = function(){ return callTracker.errOnFirstCall(); };
 
-    dal._retryOnErr(fn).then(function(res){
+    dal._retryOnErr(callTracker.errOnFirstCall()).then((res) => {
       expect(callTracker.errOnFirstCall).toHaveBeenCalledTimes(2);
       expect(res).toBe('I resolve after the first call');
     })
-    .catch(function(err){
+    .catch((err) => {
       winston.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err);
       fail(err);
     })
-    .then(function(){
+    .then(() => {
       winston.debug(new Date() + ' ' + logModule + ' ---should retry on error---\n');
       done();
     });
@@ -192,22 +200,16 @@ describe('MongoDal', () => {
 
   it('does not retry on first duplicate key error', (done) => {
     winston.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---');
-    let doc = {};
-    doc['_id'] = dal.genId();
 
-    let fn = dal.insertDoc(doc).then((id) => {
-      spyOn(dal, '_retryOnErr').and.callThrough();
-      return dal.insertDoc(doc);
-    })
+    let callTracker = new CallTracker();
+    spyOn(callTracker, 'dupKeyErr').and.callThrough();
+    winston.debug(new Date() + ' ' + logModule + ' created call tracker');
+
+    dal._retryOnErr(callTracker.dupKeyErr())
     .catch((err) => {
+      winston.debug(new Date() + ' ' + logModule + ' caught error' + err);
       expect(err.code).toBe(11000); //expect the duplicate key error
-    })
-    .then((id) => {
-      expect(dal._retryOnErr).toHaveBeenCalledTimes(1);
-    })
-    .catch((err) => {
-      winston.error(new Date() + ' ' + logModule + ' problem with inserting a doc with a dup key.' + err);
-      fail(err);
+      expect(callTracker.dupKeyErr).toHaveBeenCalledTimes(1);
     })
     .then(() => {
       winston.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---\n');
