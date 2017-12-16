@@ -128,6 +128,37 @@ class MongoDal{
     })
   }
 
+  //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
+  incCounter(id){
+    logger.debug(new Date() + ' ' + this.logModule + ' incCounter called for doc ' + id);
+    return new Promise((resolve, reject) => {
+      let opid = new ObjectId();
+      let fn = () => {
+        return new Promise(() => {
+          this.dalExample.findOneAndUpdate(
+            {'_id': id, 'opids': {'$ne': opid}},
+            {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
+            {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false})
+          .then((updatedDoc) => {
+            resolve(updatedDoc.value.counter);
+          })
+          .catch((err) => {
+            reject(err);
+          });
+        })
+      };
+
+      this._retryOnErr(fn).then((count) => {
+        logger.debug(new Date() + ' ' + this.logModule + ' counter is now set to ' + count);
+        resolve(count);
+      })
+      .catch((err) => {
+        logger.error(new Date() + ' ' + this.logModule + ' error incrementing counter: ' + err);
+        reject(err);
+      });
+    });
+  }
+
   deleteAllDocs(){
     return new Promise((resolve, reject) => {
       let fn = () => {
@@ -153,28 +184,27 @@ class MongoDal{
       .catch((err) => {
         if(err.name == 'NetworkError' || err.name == 'Interruption'){
           logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
-          return fn();
+          fn().then((res) => {
+            logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+            resolve(res);
+          })
+          .catch((err) => {
+            //eats duplicate key during retry
+            if(err.code == 11000){
+              logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+              resolve();
+            }
+            else{
+              logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
+              reject(new Error('Database Unavailable'));
+            }
+          });
         }
         //the error is not retryable
         else{
           reject(err);
         }
-      })
-      .then((res) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
-        resolve(res);
-      })
-      .catch((err) => {
-        //eats duplicate key during retry
-        if(err.code == 11000){
-          logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
-          resolve();
-        }
-        else{
-          logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
-          reject(new Error('Database Unavailable'));
-        }
-      })
+      });
     });
   }
 
