@@ -89,7 +89,7 @@ class MongoDal{
 
       let fn = () => {
         return new Promise(() => {
-          this.dalExample.insertOne(doc).then(() => {
+          this.dalExample.insertOne(doc, {w:'majority'}).then(() => {
             resolve(doc._id);
           })
           .catch((err) => {
@@ -155,7 +155,7 @@ class MongoDal{
           this.dalExample.findOneAndUpdate(
             {'_id': id, 'opids': {'$ne': opid}},
             {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
-            {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false})
+            {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
             resolve(updatedDoc.value.counter);
           })
@@ -179,7 +179,7 @@ class MongoDal{
   deleteAllDocs(){
     return new Promise((resolve, reject) => {
       let fn = () => {
-        return this.dalExample.deleteMany({});
+        return this.dalExample.deleteMany({}, {w:'majority'});
       };
 
       this._retryOnErr(fn).then(() => {
