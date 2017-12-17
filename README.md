@@ -11,7 +11,7 @@ To install dependencies with npm, navigate to the js-es6 directory and run
 npm install
 ```
 
-Before running the tests, set up the required replica set with nodes running at the following addresses by following the documentation for [deploying a replica set](https://docs.mongodb.com/v3.4/tutorial/deploy-replica-set/)
+Before running the tests, set up the required replica set with nodes running at the these addresses by following the documentation for [deploying a replica set](https://docs.mongodb.com/v3.4/tutorial/deploy-replica-set/)
 ```
 localhost:27017
 localhost:27018
@@ -31,7 +31,7 @@ The tests are only simple unit tests designed to prove the functions work and to
 
 ## Authors
 
-* **Nathaniel May** - [Maybe I'll put up my website one day](https://nathanielmay.com)
+* **Nathaniel May** - [Maybe I'll put up my website one day](http://nathanielmay.com)
 
 ## License
 
