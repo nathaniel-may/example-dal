@@ -6,7 +6,7 @@ This project contains simple examples of how to build database access access lay
 
 The Javascript example is written using ES6 classes and native promises.
 
-To install dependencies with npm, naviate to the js-es6 directory and run
+To install dependencies with npm, navigate to the js-es6 directory and run
 ```
 npm install
 ```
