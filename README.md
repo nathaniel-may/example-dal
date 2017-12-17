@@ -10,6 +10,14 @@ To install dependencies with npm, navigate to the js-es6 directory and run
 ```
 npm install
 ```
+
+Before running the tests, set up the required replica set with nodes running at the following addresses:
+```
+localhost:27017
+localhost:27018
+localhost:27019
+``` 
+
 To run the Jasmine tests run
 ```
 npm test
