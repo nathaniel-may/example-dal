@@ -3,22 +3,39 @@
 //load dependencies
 var MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
-var logger = require('winston');
+var winston = require('winston');
+
+//define vars
+var logger;
 
 class MongoDal{
 
-  constructor(connString){
+  constructor(connString, logLevel){
     this.logModule = 'DAL';
     this.connString = connString;
     this._database = null;
+    MongoDal.networkErrors = [
+      6,     //host unreachable
+      7,     //host not found
+      89,    //network timeout
+      9001   //socket exception
+    ];
+    MongoDal.interruptErrors = [
+      11601, //interrupted
+      11600, //interrupted at shutdown
+      11602, //interrupted due to repl state change
+      50     //exceeded time limit
+    ];
 
-    //logging
-    logger.remove(logger.transports.Console);
-    logger.add(logger.transports.Console, {colorize: true});
-    logger.level = 'silly';
+    //std out logging
+    logger = new (winston.Logger)({
+      transports: [
+        new (winston.transports.Console)({colorize: true})
+      ]
+    });
+    logger.level = logLevel;
 
     logger.silly(new Date() + ' ' + this.logModule + ' MongoDal constructor completed');
-
   }
 
   init(){
@@ -137,7 +154,7 @@ class MongoDal{
         return new Promise(() => {
           this.dalExample.findOneAndUpdate(
             {'_id': id, 'opids': {'$ne': opid}},
-            {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
+            {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false})
           .then((updatedDoc) => {
             resolve(updatedDoc.value.counter);
@@ -182,7 +199,7 @@ class MongoDal{
         resolve(res);
       })
       .catch((err) => {
-        if(err.name == 'NetworkError' || err.name == 'Interruption'){
+        if(MongoDal.networkErrors.includes(err.code) || MongoDal.interruptErrors.includes(err.code)){
           logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
           fn().then((res) => {
             logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
