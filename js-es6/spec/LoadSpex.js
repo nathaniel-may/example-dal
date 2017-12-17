@@ -24,7 +24,7 @@ describe('MongoDal Load Test', () => {
 
     //create MongoDal
     try{
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myReplSet', 'info');
+      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myReplSet&w=majority', 'info');
     }
     catch(err){
       logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
