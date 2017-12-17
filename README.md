@@ -18,11 +18,24 @@ localhost:27018
 localhost:27019
 ``` 
 
-To run the Jasmine tests run
+To run the Jasmine unit tests run
 ```
 npm test
 ```
-The tests are only simple unit tests designed to prove the functions work and to guide developers when attempting ot make changes to the example.
+
+There are several types of tests in the spec directory. Simple unit tests are under DalSpec.js and optional rudimentary load tests are in LoadSpex.js. 
+
+To run the load tests, first change the name of the file
+```
+mv spec/LoadSpex.js spec/LoadSpec.js
+```
+then run
+```
+npm test
+```
+to run both files
+
+These tests are simple and are only designed to prove the functions work under normal conditions and to guide developers when attempting to make changes to the example functions.
 
 ## Learning Resources 
 
