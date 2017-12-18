@@ -8,21 +8,6 @@ var winston = require('winston');
 //define vars
 var logger;
 
-//define static class vars
-MongoDal.networkErrors = [
-  6,     //host unreachable
-  7,     //host not found
-  89,    //network timeout
-  9001   //socket exception
-];
-
-MongoDal.interruptErrors = [
-  11601, //interrupted
-  11600, //interrupted at shutdown
-  11602, //interrupted due to repl state change
-  50     //exceeded time limit
-];
-
 class MongoDal{
 
   constructor(connString, logLevel){
@@ -222,5 +207,20 @@ class MongoDal{
   }
 
 }
+
+//define static class vars
+MongoDal.networkErrors = [
+  6,     //host unreachable
+  7,     //host not found
+  89,    //network timeout
+  9001   //socket exception
+];
+
+MongoDal.interruptErrors = [
+  11601, //interrupted
+  11600, //interrupted at shutdown
+  11602, //interrupted due to repl state change
+  50     //exceeded time limit
+];
 
 module.exports = MongoDal;
