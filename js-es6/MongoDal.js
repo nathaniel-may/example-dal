@@ -8,24 +8,27 @@ var winston = require('winston');
 //define vars
 var logger;
 
+//define static class vars
+MongoDal.networkErrors = [
+  6,     //host unreachable
+  7,     //host not found
+  89,    //network timeout
+  9001   //socket exception
+];
+
+MongoDal.interruptErrors = [
+  11601, //interrupted
+  11600, //interrupted at shutdown
+  11602, //interrupted due to repl state change
+  50     //exceeded time limit
+];
+
 class MongoDal{
 
   constructor(connString, logLevel){
     this.logModule = 'DAL';
     this.connString = connString;
     this._database = null;
-    MongoDal.networkErrors = [
-      6,     //host unreachable
-      7,     //host not found
-      89,    //network timeout
-      9001   //socket exception
-    ];
-    MongoDal.interruptErrors = [
-      11601, //interrupted
-      11600, //interrupted at shutdown
-      11602, //interrupted due to repl state change
-      50     //exceeded time limit
-    ];
 
     //std out logging
     logger = new (winston.Logger)({
@@ -144,7 +147,7 @@ class MongoDal{
     return new Promise((resolve, reject) => {
       let opid = new ObjectId();
       let fn = () => {
-        return new Promise(() => {
+        return new Promise((resolve, reject) => {
           this.dalExample.findOneAndUpdate(
             {'_id': id, 'opids': {'$ne': opid}},
             {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
