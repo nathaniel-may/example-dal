@@ -88,14 +88,7 @@ class MongoDal{
       }
 
       let fn = () => {
-        return new Promise(() => {
-          this.dalExample.insertOne(doc, {w:'majority'}).then(() => {
-            resolve(doc._id);
-          })
-          .catch((err) => {
-            reject(err);
-          })
-        })
+        return this.dalExample.insertOne(doc, {w:'majority'});
       };
 
       this._retryOnErr(fn).then((res) => {
