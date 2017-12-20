@@ -85,7 +85,7 @@ describe('MongoDal', () => {
 
     //create MongoDal
     try{
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myReplSet&w=majority', 'silly');
+      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', 'silly');
     }
     catch(err){
       logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
@@ -232,7 +232,7 @@ describe('MongoDal', () => {
     spyOn(callTracker, 'dupKeyErr').and.callThrough();
     logger.debug(new Date() + ' ' + logModule + ' created call tracker');
 
-    dal._retryOnErr(() => {return callTracker.dupKeyErr();})
+    dal._retryOnErr(() => callTracker.dupKeyErr())
     .catch((err) => {
       logger.debug(new Date() + ' ' + logModule + ' caught error' + err);
       expect(err.code).toBe(11000); //expect the duplicate key error
@@ -251,7 +251,7 @@ describe('MongoDal', () => {
     spyOn(callTracker, 'netErrThenDupKey').and.callThrough();
     logger.debug(new Date() + ' ' + logModule + ' created call tracker');
 
-    dal._retryOnErr(() => {return callTracker.netErrThenDupKey();})
+    dal._retryOnErr(() => callTracker.netErrThenDupKey())
     .then(() => {
       logger.debug(new Date() + ' ' + logModule + ' no error');
       expect(callTracker.netErrThenDupKey).toHaveBeenCalledTimes(2);
@@ -276,9 +276,8 @@ describe('MongoDal', () => {
       doc._id = id;
       return dal.incCounter(id);
     })
-    .then((count) => {
-      logger.debug(new Date() + ' ' + logModule + ' incCounter reports a new count of ' + count);
-      expect(count).toBe(1);
+    .then(() => {
+      logger.debug(new Date() + ' ' + logModule + ' incCounter success');
       return dal.getById(doc._id);
     })
     .then((doc) => {
