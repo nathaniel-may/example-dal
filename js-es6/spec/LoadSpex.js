@@ -24,7 +24,7 @@ describe('MongoDal Load Test', () => {
 
     //create MongoDal
     try{
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myReplSet&w=majority', 'info');
+      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', 'info');
     }
     catch(err){
       logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
@@ -55,13 +55,9 @@ describe('MongoDal Load Test', () => {
     dal.insertDoc({counter: 0}).then((id) => {
       logger.debug(new Date() + ' ' + logModule + ' inserted single counter doc');
       docId = id;
-      let i=0;
-      let promises = [];
-      while(i < goal){
-        promises.push(dal.incCounter(id));
-        i++;
-      }
+      let promises = Array(goal).fill().map(() => dal.incCounter(id));
       logger.debug(new Date() + ' ' + logModule + ' about to fire all promises');
+      //TODO timer here
       return Promise.all(promises);
     })
     .then(() => {
