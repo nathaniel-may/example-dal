@@ -6,15 +6,15 @@ This project contains simple examples of how to build database access access lay
 
 Each of the examples requires a replica set to use features such as read and write concern. Each example will have a connection string that can be changed to point to an existing replica set, or the following instructions can be used to setup a simple test instance locally.
 
-#Installation
+### Installation
 
 These instructions assume MongoDB is already installed. For instructions on installing MongoDB please see the [installation tutorials](https://docs.mongodb.com/v3.4/installation/#tutorials) in the documentation.
 
-#Configuration Files
+### Configuration Files
 
 Look at the configuration files under the local-mongo/conf/ directory and make sure the storage.dbpath and the systemlog.path directories exist and are writable by mongodb. Before starting a node nothing can be occupying the port specified in net.port.
 
-#Starting Nodes
+### Starting Nodes
 Navigate to the local-mongo/conf directory and execute the following three commands:
 ```
 mongod -f ./mongod0.conf
@@ -26,7 +26,7 @@ Common startup errors are addressed in the configuration files section above.
 
 For future startups of the same replica set, use these same three commands and skip the following section.
 
-#Configuring the Replica set
+### Configuring the Replica set
 
 This set of instructions only needs to be followed the first time this replica set starts.
 
@@ -53,7 +53,7 @@ rs.initiate(
 The replica set is now running and ready to use. 
 
 
-### Javascript: Getting Started
+## Javascript: Getting Started
 
 The Javascript example is written using ES6 classes and native promises.
 
