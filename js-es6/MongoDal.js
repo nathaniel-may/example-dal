@@ -138,7 +138,10 @@ class MongoDal{
             {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
-            resolve(updatedDoc.value.counter);
+            logger.debug(new Date() + ' ' + this.logModule + ' incCounter updated doc ' + id + ' to ' + updatedDoc.value.counter);
+            //doesn't return the new value because after a retry where the value had already updated, 
+            //this would be undefined. To get an accurate value, query the doc byId afterward.
+            resolve();
           })
           .catch((err) => {
             reject(err);
@@ -208,6 +211,7 @@ class MongoDal{
 
 }
 
+//TODO dictionaries instead of comments
 //define static class vars
 MongoDal.networkErrors = [
   6,     //host unreachable
