@@ -131,6 +131,8 @@ class MongoDal{
     logger.debug(new Date() + ' ' + this.logModule + ' incCounter called for doc ' + id);
     return new Promise((resolve, reject) => {
       let opid = new ObjectId();
+      //TODO delete this logline
+      logger.debug(new Date() + ' ' + this.logModule + ' OPID: ' + opid);
       let fn = () => {
         return new Promise((resolve, reject) => {
           this.dalExample.findOneAndUpdate(
@@ -138,7 +140,7 @@ class MongoDal{
             {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
-            logger.debug(new Date() + ' ' + this.logModule + ' incCounter updated doc ' + id + ' to ' + updatedDoc.value.counter);
+            logger.debug(new Date() + ' ' + this.logModule + ' incCounter updated doc');
             //doesn't return the new value because after a retry where the value had already updated, 
             //this would be undefined. To get an accurate value, query the doc byId afterward.
             resolve();
@@ -203,6 +205,7 @@ class MongoDal{
         }
         //the error is not retryable
         else{
+          logger.debug(new Date() + ' ' + this.logModule + ' error is not retryable: ' + err);
           reject(err);
         }
       });

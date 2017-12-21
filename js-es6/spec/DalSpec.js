@@ -66,6 +66,29 @@ class CallTracker{
       reject(err);
     })
   }
+
+  sockExceptCallThrough(fn){
+    this.called++;
+    logger.debug(new Date() + ' ' + ' CALLTRACKER fnn: ' + fn);
+    return new Promise((resolve, reject) => {
+      let err = new MongoError();
+      err.code = 9001;
+
+      if(this.called == 1){
+        fn().then(() => {
+          reject(err);
+        })
+        .catch((err) => {
+          reject();
+        });
+      }
+      else{
+        //TODO make this one return line
+        fn().then(() => resolve())
+        .catch(() => reject());
+      }
+    });
+  }
   
 };
 
@@ -294,11 +317,51 @@ describe('MongoDal', () => {
     });
   });
 
-  xit('doesnt double count after network error', (done) => {
+  fit('doesnt double count after network error', (done) => {
+    logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
+    let counterDoc = {};
+    counterDoc.counter = 0;
 
+    let callTracker = new CallTracker();
+    let updateFn;
+
+    spyOn(dal, '_retryOnErr').and.callThrough();
+
+    dal.insertDoc(counterDoc).then((id) => {
+      logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      counterDoc._id = id;
+      return dal.incCounter(id);
+    })
+    .then(() => {
+      logger.debug(new Date() + ' ' + logModule + ' incCounter success');
+      updateFn = dal.incCounter; //TODO needs to INCLUDE OPCOUNTER gen not just the query
+      return dal.getById(counterDoc._id);
+    })
+    .then((doc) => {
+      logger.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      expect(doc.counter).toBe(1);
+      return dal._retryOnErr(() => callTracker.sockExceptCallThrough(() => updateFn()));
+    })
+    .then(() => {
+      logger.debug(new Date() + ' ' + logModule + ' incCounter success with network error');
+      return dal.getById(counterDoc._id);
+    })
+    .then((doc) => {
+      logger.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      expect(doc.counter).toBe(2);
+    })
+    .catch((err) => {
+      logger.error(new Date() + ' ' + logModule + ' error avoiding double count: ' + err);
+      fail();
+    })
+    .then(() => {
+      logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---\n');
+      done();
+    });
+    
   });
 
-  afterEach((done) => {
+  xafterEach((done) => {
     logger.silly(new Date() + ' ' + logModule + ' ---after each---');
 
     dal.deleteAllDocs()
