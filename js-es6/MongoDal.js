@@ -183,7 +183,7 @@ class MongoDal{
         resolve(res);
       })
       .catch((err) => {
-        if(MongoDal.networkErrors.includes(err.code) || MongoDal.interruptErrors.includes(err.code)){
+        if(MongoDal.networkErrors[err.code] != undefined || MongoDal.interruptErrors[err.code] != undefined){
           logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
           fn().then((res) => {
             logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
@@ -211,20 +211,19 @@ class MongoDal{
 
 }
 
-//TODO dictionaries instead of comments
 //define static class vars
-MongoDal.networkErrors = [
-  6,     //host unreachable
-  7,     //host not found
-  89,    //network timeout
-  9001   //socket exception
-];
+MongoDal.networkErrors = {
+  6:'host unreachable',
+  7:'host not found',
+  89:'network timeout',
+  9001:'socket exception'
+};
 
-MongoDal.interruptErrors = [
-  11601, //interrupted
-  11600, //interrupted at shutdown
-  11602, //interrupted due to repl state change
-  50     //exceeded time limit
-];
+MongoDal.interruptErrors = {
+  11601:'interrupted',
+  11600:'interrupted at shutdown',
+  11602:'interrupted due to repl state change',
+  50:'exceeded time limit'
+};
 
 module.exports = MongoDal;
