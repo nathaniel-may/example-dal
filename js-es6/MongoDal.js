@@ -5,9 +5,6 @@ var MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
 var winston = require('winston');
 
-//define vars
-var logger;
-
 class MongoDal{
 
   constructor(connString, logLevel){
@@ -16,19 +13,19 @@ class MongoDal{
     this._database = null;
 
     //std out logging
-    logger = new (winston.Logger)({
+    this.logger = new (winston.Logger)({
       transports: [
         new (winston.transports.Console)({colorize: true})
       ]
     });
-    logger.level = logLevel;
+    this.logger.level = logLevel;
 
-    logger.silly(new Date() + ' ' + this.logModule + ' MongoDal constructor completed');
+    this.logger.silly(new Date() + ' ' + this.logModule + ' MongoDal constructor completed');
   }
 
   init(){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' init function called');
+      this.logger.debug(new Date() + ' ' + this.logModule + ' init function called');
       this._connect('dal').then((db) => {
         //define database object
         this._database = db;
@@ -37,25 +34,25 @@ class MongoDal{
         this.dalExample = db.collection('example');
 
         resolve();
-        logger.debug(new Date() + ' ' + this.logModule + ' init function completed');
+        this.logger.debug(new Date() + ' ' + this.logModule + ' init function completed');
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
+        this.logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
         reject(err);
       });
     });
   };
 
   _connect(dbName){
-    logger.debug(new Date() + ' ' + this.logModule + ' _connect function called for database ' + dbName + '.');
+    this.logger.debug(new Date() + ' ' + this.logModule + ' _connect function called for database ' + dbName + '.');
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' attempting mongodb connection with conn string ' + this.connString);
+      this.logger.debug(new Date() + ' ' + this.logModule + ' attempting mongodb connection with conn string ' + this.connString);
       MongoClient.connect(this.connString).then((db) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' MongoClient success');
+        this.logger.debug(new Date() + ' ' + this.logModule + ' MongoClient success');
         resolve(db.db(dbName));
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
+        this.logger.error(new Date() + ' ' + this.logModule + ' could not establish a connection to mongod.\' Check that the database is actually up. Error: ' + err);
         reject(err);
       });
     });
@@ -63,7 +60,7 @@ class MongoDal{
 
   insertDoc(docIn){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called with doc ' + JSON.stringify(docIn));
+      this.logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called with doc ' + JSON.stringify(docIn));
 
       //creating a deep copy to avoid modifying in the previous scope
       //note that Date() objects become type ISODate which is OK for MongoDB
@@ -80,11 +77,11 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then((res) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' document successfully inserted');
+        this.logger.debug(new Date() + ' ' + this.logModule + ' document successfully inserted');
         resolve(doc._id);
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error inserting doc: ' + err);
+        this.logger.error(new Date() + ' ' + this.logModule + ' error inserting doc: ' + err);
         reject(err);
       })
     });
@@ -92,18 +89,18 @@ class MongoDal{
 
   getById(id){
     return new Promise((resolve, reject) => {
-      logger.debug(new Date() + ' ' + this.logModule + ' getById function called with id ' + id);
+      this.logger.debug(new Date() + ' ' + this.logModule + ' getById function called with id ' + id);
 
       let fn = () => {
         return this.dalExample.find({_id: id}).comment('getById from MongoDal.js').next();
       };
 
       this._retryOnErr(fn).then((doc) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' found doc with id ' + id);
+        this.logger.debug(new Date() + ' ' + this.logModule + ' found doc with id ' + id);
         resolve(doc);
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
+        this.logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
         reject(err);
       });
     });
@@ -116,11 +113,11 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then((count) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' collection count is ' + count);
+        this.logger.debug(new Date() + ' ' + this.logModule + ' collection count is ' + count);
         resolve(count);
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error counting collection: ' + err);
+        this.logger.error(new Date() + ' ' + this.logModule + ' error counting collection: ' + err);
         reject(err);
       });
     })
@@ -128,11 +125,14 @@ class MongoDal{
 
   //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
   incCounter(id){
-    logger.debug(new Date() + ' ' + this.logModule + ' incCounter called for doc ' + id);
+    this.logger.silly(new Date() + ' ' + this.logModule + ' incCounter called for doc ' + id);
+    let opid = new ObjectId();
+    return this._incCounterTail(id, opid);
+  }
+
+  _incCounterTail(id, opid){
+    this.logger.silly(new Date() + ' ' + this.logModule + ' incCounterTail called for doc ' + id);
     return new Promise((resolve, reject) => {
-      let opid = new ObjectId();
-      //TODO delete this logline
-      logger.debug(new Date() + ' ' + this.logModule + ' OPID: ' + opid);
       let fn = () => {
         return new Promise((resolve, reject) => {
           this.dalExample.findOneAndUpdate(
@@ -140,10 +140,8 @@ class MongoDal{
             {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
-            logger.debug(new Date() + ' ' + this.logModule + ' incCounter updated doc');
-            //doesn't return the new value because after a retry where the value had already updated, 
-            //this would be undefined. To get an accurate value, query the doc byId afterward.
-            resolve();
+            this.logger.silly(new Date() + ' ' + this.logModule + ' incCounter updated doc');
+            resolve(updatedDoc.value.counter);
           })
           .catch((err) => {
             reject(err);
@@ -152,11 +150,13 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then((count) => {
-        logger.debug(new Date() + ' ' + this.logModule + ' counter is now set to ' + count);
-        resolve(count);
+        this.logger.debug(new Date() + ' ' + this.logModule + ' counter incremented to ' + count);
+        //doesn't return the new value because after a retry where the value had already updated, 
+        //this would be undefined. To get an accurate value, query the doc byId afterward.
+        resolve();
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error incrementing counter: ' + err);
+        this.logger.error(new Date() + ' ' + this.logModule + ' error incrementing counter: ' + err);
         reject(err);
       });
     });
@@ -169,11 +169,11 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then(() => {
-        logger.debug(new Date() + ' ' + this.logModule + ' deleted all docs');
+        this.logger.debug(new Date() + ' ' + this.logModule + ' deleted all docs');
         resolve();
       })
       .catch((err) => {
-        logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
+        this.logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
         reject(err);
       });
     });
@@ -186,26 +186,26 @@ class MongoDal{
       })
       .catch((err) => {
         if(MongoDal.networkErrors[err.code] != undefined || MongoDal.interruptErrors[err.code] != undefined){
-          logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
+          this.logger.warn(new Date() + ' ' + this.logModule + ' experienced network error- retrying');
           fn().then((res) => {
-            logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+            this.logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
             resolve(res);
           })
           .catch((err) => {
             //eats duplicate key during retry
             if(err.code == 11000){
-              logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
+              this.logger.debug(new Date() + ' ' + this.logModule + ' retry resolved network error');
               resolve();
             }
             else{
-              logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
+              this.logger.error(new Date() + ' ' + this.logModule + ' could not resolve with retry: ' + err);
               reject(new Error('Database Unavailable'));
             }
           });
         }
         //the error is not retryable
         else{
-          logger.debug(new Date() + ' ' + this.logModule + ' error is not retryable: ' + err);
+          this.logger.debug(new Date() + ' ' + this.logModule + ' error is not retryable: ' + err);
           reject(err);
         }
       });
