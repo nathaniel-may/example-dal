@@ -315,8 +315,54 @@ describe('MongoDal', () => {
     });
   });
 
-  xit('doesnt double count after network error', (done) => {
-    //TODO not an easy test
+  fit('doesnt double count after network error', (done) => {
+    this.logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
+    let counterDoc = {};
+    counterDoc.counter = 0;
+
+    let callTracker = new CallTracker();
+    let updateFn;
+
+    spyOn(dal, '_retryOnErr').and.callThrough();
+
+    dal.insertDoc(counterDoc).then((id) => {
+      this.logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      counterDoc._id = id;
+      let opid = new ObjectId();
+      //TODO this step is unnecessary
+      return dal._incCounterTail(id, opid);
+    })
+    .then(() => {
+      this.logger.debug(new Date() + ' ' + logModule + ' incCounter success');
+      updateFn = dal.incCounter;
+      return dal.getById(counterDoc._id);
+    })
+    .then((doc) => {
+      this.logger.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      expect(doc.counter).toBe(1);
+      //TODO this nonsense
+      updateFn.bind(dal);
+      let updateCall = () => updateFn();
+      let toRetry = () => callTracker.sockExceptCallThrough(updateCall);
+      return dal._retryOnErr(toRetry);
+    })
+    .then(() => {
+      this.logger.debug(new Date() + ' ' + logModule + ' incCounter success with network error');
+      return dal.getById(counterDoc._id);
+    })
+    .then((doc) => {
+      this.logger.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      expect(doc.counter).toBe(2);
+    })
+    .catch((err) => {
+      this.logger.error(new Date() + ' ' + logModule + ' error avoiding double count: ' + err);
+      fail();
+    })
+    .then(() => {
+      this.logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---\n');
+      done();
+    });
+    
   });
 
   afterEach((done) => {
