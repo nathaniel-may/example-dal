@@ -315,7 +315,7 @@ describe('MongoDal', () => {
     });
   });
 
-  fit('doesnt double count after network error', (done) => {
+  xit('doesnt double count after network error', (done) => {
     this.logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
     let counterDoc = {};
     counterDoc.counter = 0;
