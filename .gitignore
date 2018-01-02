@@ -1,4 +1,6 @@
-//Javascript
+//MongoDB
 *.log*
+
+//Javascript
 node_modules/
 package-lock.json
