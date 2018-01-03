@@ -282,7 +282,7 @@ describe('MongoDal', () => {
       fail();
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---\n');
+      this.logger.debug(new Date() + ' ' + logModule + ' ---retries and eats duplicate key error on insert retry---\n');
       done();
     });
   });
