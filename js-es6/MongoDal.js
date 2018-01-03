@@ -3,6 +3,7 @@
 //load dependencies
 var MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
+var ReadConcern = require('mongodb').ReadConcern;
 var winston = require('winston');
 
 class MongoDal{
@@ -31,7 +32,9 @@ class MongoDal{
         this._database = db;
 
         //define all necessary collections
-        this.dalExample = db.collection('example');
+        this.dalExample = db.collection('example', {readConcern: {level: 'majority'}});
+        this.dalExampleLin = db.collection('example', {readConcern: {level: 'linearizable'}});
+
 
         resolve();
         this.logger.debug(new Date() + ' ' + this.logModule + ' init function completed');
@@ -91,8 +94,14 @@ class MongoDal{
     return new Promise((resolve, reject) => {
       this.logger.debug(new Date() + ' ' + this.logModule + ' getById function called with id ' + id);
 
+      //uses dalExampleLin which was created with the linearizable read concern
+      //all linearized operations need a maxTimeMS to guard against the loss of 
+      //a majority of servers, and an hanging operation
       let fn = () => {
-        return this.dalExample.find({_id: id}).comment('getById from MongoDal.js').next();
+        return this.dalExampleLin.find({_id: id})
+          .comment('getById from MongoDal.js with readConcern linearizable and 10s maxTimeMS')
+          .maxTimeMS(10000)
+          .next();
       };
 
       this._retryOnErr(fn).then((doc) => {
