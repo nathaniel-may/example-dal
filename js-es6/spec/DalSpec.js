@@ -3,11 +3,10 @@ var winston = require('winston');
 var ObjectId = require('mongodb').ObjectId;
 var MongoError = require('mongodb').MongoError;
 var MongoDal = require('../MongoDal');
-//TODO REMOVE THIS***
-var CircularJSON = require('circular-json');
 
 //define variables
 var dal;
+var connString = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority';
 
 //std out logging settings
 this.logger = new (winston.Logger)({
@@ -108,7 +107,7 @@ describe('MongoDal', () => {
 
     //create MongoDal
     try{
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', 'silly');
+      dal = new MongoDal(connString, 'silly');
     }
     catch(err){
       this.logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
@@ -368,7 +367,7 @@ describe('MongoDal', () => {
   });
 
   fit('2 doesnt double count after network error 2 ', (done) => {
-    this.logger.silly(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
+    this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
     let counterDoc = {};
     counterDoc.counter = 0;
 
@@ -416,8 +415,7 @@ describe('MongoDal', () => {
           }
           else if(this.called == 2){
             this.logger.silly(new Date() + ' ' + logModule + ' callThroughWithNetErr called for second time, calling again');
-            let res = realCol.findOneAndUpdate(query, update, options)
-            console.log('******' + JSON.stringify(res));
+            let res = realCol.findOneAndUpdate(query, update, options);
             resolve(res);
           }
           else{
@@ -436,18 +434,30 @@ describe('MongoDal', () => {
       this.logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
       counterDoc._id = id;
       
-      //Does this *actually* replace the dalExample variable???
+      //replace the collection definition with a mockup
       dal.dalExample = fakeCol;
 
       return dal.incCounter(id);
     })
     .then(() => {
       expect(fakeCol.called).toBe(2);
+      this.logger.debug(new Date() + ' ' + logModule + ' this test wrecked the dal instance. Making a new one');
+      dal = new MongoDal(connString, 'silly');
+      return dal.init();
+    })
+    .then(() => {
+      this.logger.silly(new Date() + ' ' + logModule + ' new instance created. Finding document to compare count');
       return dal.getById(counterDoc._id);
     })
     .then((res) => {
       expect(res.counter).toBe(1);
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', 'silly');
+    })
+    .catch((err) => {
+      this.logger.error(new Date() + ' ' + logModule + ' err: ' + err);
+    })
+    .then(() => {
+      this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---\n');
+      done();
     });
 
   });
