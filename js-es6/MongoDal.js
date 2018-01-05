@@ -150,7 +150,7 @@ class MongoDal{
   }
 
   //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
-  incCounter(id, opid){
+  incCounter(id){
     return new Promise((resolve, reject) => {
       this.logger.silly(new Date() + ' ' + this.logModule + ' incCounter called for doc ' + id);
 
