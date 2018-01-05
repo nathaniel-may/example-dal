@@ -174,7 +174,14 @@ class MongoDal{
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
             this.logger.silly(new Date() + ' ' + this.logModule + ' incCounter updated doc');
-            resolve(updatedDoc.value.counter);
+            //value will be null when it matches no documents. this will happen when a network error 
+            //occurred on the way back from the db before the retry, and the retry doesn't match any documents
+            if(null != updatedDoc.value){
+              resolve(updatedDoc.value.counter);
+            }
+            else{
+              resolve();
+            }
           })
           .catch((err) => {
             reject(err);
@@ -184,7 +191,12 @@ class MongoDal{
 
       //call the function with retry logic
       this._retryOnErr(fn).then((count) => {
-        this.logger.debug(new Date() + ' ' + this.logModule + ' counter incremented to ' + count);
+        if(undefined != count){
+          this.logger.debug(new Date() + ' ' + this.logModule + ' counter incremented to ' + count);
+        }
+        else{
+          this.logger.debug(new Date() + ' ' + this.logModule + ' counter is undefined because the query matched no documents or a retry resolved a network error');
+        }
         //doesn't return the new value because while retrying after a network error which interrupted
         //the ok response, the query will match -no documents- since the operation succeeded and the 
         //opid will be present in the opids array. the response of the query will be undefined

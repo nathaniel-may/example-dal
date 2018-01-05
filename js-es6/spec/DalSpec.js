@@ -6,6 +6,7 @@ var MongoDal = require('../MongoDal');
 
 //define variables
 var dal;
+var connString = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority';
 
 //std out logging settings
 this.logger = new (winston.Logger)({
@@ -106,7 +107,7 @@ describe('MongoDal', () => {
 
     //create MongoDal
     try{
-      dal = new MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', 'silly');
+      dal = new MongoDal(connString, 'silly');
     }
     catch(err){
       this.logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
@@ -315,8 +316,99 @@ describe('MongoDal', () => {
     });
   });
 
-  xit('doesnt double count after network error', (done) => {
-    //TODO not an easy test
+  it('doesnt double count after network error', (done) => {
+    this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
+    let counterDoc = {};
+    counterDoc.counter = 0;
+
+    let callTracker = new CallTracker();
+
+    class FakeCol{
+
+      constructor(realCol){      
+        this.called = 0;
+        this.realCol = realCol;
+
+        //std out logging settings
+        this.logger = new (winston.Logger)({
+          transports: [
+            new (winston.transports.Console)({colorize: true})
+          ]
+        });
+        this.logger.level = 'silly';
+
+        this.logger.silly(new Date() + ' ' + logModule + ' FakeCol instance created');
+      }
+
+      findOneAndUpdate(query, update, options){
+        this.logger.silly(new Date() + ' ' + logModule + ' findOneAndUpdate called');
+        return this.callThroughWithNetErr(query, update, options);
+      }
+
+      callThroughWithNetErr(query, update, options){
+        return new Promise((resolve, reject) => {
+          this.called++;
+
+          let sockErr = new MongoError();
+          sockErr.code = 9001;
+          
+          if(this.called == 1){
+            this.logger.silly(new Date() + ' ' + logModule + ' callThroughWithNetErr called for first time');
+            realCol.findOneAndUpdate(query, update, options).then(() => {
+              this.logger.silly(new Date() + ' ' + logModule + ' rejecting with socket err');
+              reject(sockErr);
+            })
+            .catch(err => {
+              this.logger.err(new Date() + ' ' + logModule + ' unexpected error' + err);
+              reject(err);
+            });
+          }
+          else if(this.called == 2){
+            this.logger.silly(new Date() + ' ' + logModule + ' callThroughWithNetErr called for second time, calling again');
+            let res = realCol.findOneAndUpdate(query, update, options);
+            resolve(res);
+          }
+          else{
+            this.logger.error(new Date() + ' ' + logModule + ' called more than twice');
+            reject(new Error('called more than twice'));
+          }
+        });
+      }
+    }
+
+    let realCol = dal._database.collection('example');;
+    let fakeCol = new FakeCol(realCol);
+
+    dal.insertDoc(counterDoc).then((id) => {
+      this.logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      counterDoc._id = id;
+      
+      //replace the collection definition with a mockup
+      dal.dalExample = fakeCol;
+
+      return dal.incCounter(id);
+    })
+    .then(() => {
+      expect(fakeCol.called).toBe(2);
+      this.logger.debug(new Date() + ' ' + logModule + ' this test wrecked the dal instance. Making a new one');
+      dal = new MongoDal(connString, 'silly');
+      return dal.init();
+    })
+    .then(() => {
+      this.logger.silly(new Date() + ' ' + logModule + ' new instance created. Finding document to compare count');
+      return dal.getById(counterDoc._id);
+    })
+    .then((res) => {
+      expect(res.counter).toBe(1);
+    })
+    .catch((err) => {
+      this.logger.error(new Date() + ' ' + logModule + ' err: ' + err);
+    })
+    .then(() => {
+      this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---\n');
+      done();
+    });
+
   });
 
   afterEach((done) => {
