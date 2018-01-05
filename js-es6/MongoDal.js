@@ -157,7 +157,13 @@ class MongoDal{
       };
 
       this._retryOnErr(fn).then((count) => {
-        this.logger.debug(new Date() + ' ' + this.logModule + ' counter incremented to ' + count);
+        if(undefined != count){
+          this.logger.debug(new Date() + ' ' + this.logModule + ' counter incremented to ' + count);
+        }
+        else{
+          this.logger.debug(new Date() + ' ' + this.logModule + ' counter is undefined likely because a retry resolved a network error');
+        }
+        
         //doesn't return the new value because after a retry where the value had already updated, 
         //this would be undefined. To get an accurate value, query the doc byId afterward.
         resolve();
