@@ -88,6 +88,10 @@ to run both files
 
 These tests are simple and are only designed to prove the functions work under normal conditions and to guide developers when attempting to make changes to the example functions.
 
+## Python: Getting Started
+
+The Python example is written in Python3 and is currently in the early stages of development.
+
 ## Learning Resources 
 
 * [Jesse Davis's Blog](https://emptysqua.re/blog/how-to-write-resilient-mongodb-applications/) - Driver developer at MongoDB
