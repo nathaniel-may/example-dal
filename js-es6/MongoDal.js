@@ -141,7 +141,14 @@ class MongoDal{
             {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
           .then((updatedDoc) => {
             this.logger.silly(new Date() + ' ' + this.logModule + ' incCounter updated doc');
-            resolve(updatedDoc.value.counter);
+            //value will be null such as in the case where a network error occurred on the way back
+            //to the server before the retry
+            if(null != updatedDoc.value){
+              resolve(updatedDoc.value.counter);
+            }
+            else{
+              resolve();
+            }
           })
           .catch((err) => {
             reject(err);
