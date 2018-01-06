@@ -27,5 +27,5 @@ class MongoDal:
 		doc.update({'_id': id})
 		#TODO RETRY and ERROR HANDLE
 		global dalExample
-		dalExample.insert(doc)
+		dalExample.insert_one(doc)
 		return id;
