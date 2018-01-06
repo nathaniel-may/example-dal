@@ -90,7 +90,17 @@ These tests are simple and are only designed to prove the functions work under n
 
 ## Python: Getting Started
 
-The Python example is written in Python3 and is currently in the early stages of development.
+The Python example is written in Python 3 and is currently in the early stages of development. Unit tests are written with the unittest package.
+
+To install the mongodb driver run 
+```
+python3 -m pip install pymongo
+```
+
+To run the unit tests run
+```
+python3 ./mongo_dal_test.py
+```
 
 ## Learning Resources 
 
