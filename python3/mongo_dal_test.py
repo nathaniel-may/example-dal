@@ -24,6 +24,11 @@ class MongoDalTest(unittest.TestCase):
         cls.dal.init()
         cls.logger.debug('----------setUpClass----------\n')
 
+    def tearDown(self):
+        self.logger.debug('----------tearDown----------')
+        self.dal.delete_all_docs()
+        self.logger.debug('----------tearDown----------\n')
+
 
     def testInsertingOneDoc(self):
         self.logger.debug('----------testInsertingOneDoc----------')
@@ -34,9 +39,29 @@ class MongoDalTest(unittest.TestCase):
           'subDoc': {'string1': 'str1', 'str2': 'str2'}
         }
         #TODO: Error Handle
-        id = self.dal.insertDoc(testDoc)
+        id = self.dal.insert_doc(testDoc)
         self.assertTrue(isinstance(id, ObjectId))
         self.logger.debug('----------testInsertingOneDoc----------\n')
+
+    def testGetById(self):
+        #self.skipTest('not implemented yet')
+        self.logger.debug('----------testGetById----------')
+        testDoc = {'test': True}
+        id = self.dal.insert_doc(testDoc)
+        doc = self.dal.get_by_id(id)
+        self.assertEqual(id, testDoc['_id'])
+        self.assertEqual(doc['test'], testDoc['test'])
+        self.logger.debug('----------testGetById----------\n')
+
+    def testIncCounter(self):
+        self.skipTest('not implemented yet')
+        self.logger.debug('----------testIncCounter----------')
+        testDoc = {counter: 0}
+        id = self.dal.insert_doc(testDoc)
+        self.dal.inc_counter()
+        doc = self.dal.get_by_id(id)
+        self.assertEquals(1, doc.counter)
+        self.logger.debug('----------testIncCounter----------\n')
 
 if __name__ == '__main__':
     unittest.main()

@@ -23,20 +23,37 @@ class MongoDal:
         self.logger.debug('completed __init__')
 
     def init(self):
+        #connect to mongodb
         self.logger.debug('started init()')
         if(self.client is None):
             self.client = MongoClient(self.connString)
-        db = self.client.dalExample
+        db = self.client.pydal
+
         #create all collections
         self.dalExample = db.example
         self.logger.debug('completed init()')
 
-    def insertDoc(self, doc):
-        self.logger.debug('started insertDoc()')
+    def insert_doc(self, doc):
+        self.logger.debug('started insert_doc()')
         id = ObjectId()
         doc.update({'_id': id})
         #TODO RETRY and ERROR HANDLE
         self.dalExample.insert_one(doc)
         self.logger.debug('completed insertDoc()')
         return id;
+
+    def get_by_id(self, id):
+        self.logger.debug('started get_by_id()')
+        #TODO retry and error handle
+        doc = self.dalExample.find_one({'_id': id})
+        self.logger.debug('completed get_by_id()')
+        return doc
+
+
+    def delete_all_docs(self):
+        self.logger.debug('started delete_all_docs()')
+        #TODO error handle
+        self.dalExample.delete_many({})
+        self.logger.debug('completed delete_all_docs()')
+
 
