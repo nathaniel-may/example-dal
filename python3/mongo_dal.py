@@ -33,6 +33,9 @@ class MongoDal:
         self.dalExample = db.example
         self.logger.debug('completed init()')
 
+    def close(self):
+        self.client.close()
+
     def insert_doc(self, doc):
         self.logger.debug('started insert_doc()')
         id = ObjectId()

@@ -24,6 +24,10 @@ class MongoDalTest(unittest.TestCase):
         cls.dal.init()
         cls.logger.debug('----------setUpClass----------\n')
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.dal.close()
+
     def tearDown(self):
         self.logger.debug('----------tearDown----------')
         self.dal.delete_all_docs()
