@@ -30,7 +30,7 @@ class MongoDal:
     def connect(self):
         #connect to mongodb
         self.logger.debug('started init()')
-        if(self.client is None):
+        if self.client is None:
             self.logger.info('setting up the connection')
             self.client = MongoClient(self.connString, 
                 serverSelectionTimeoutMS=10) #TODO seconds or milliseconds?
@@ -51,15 +51,16 @@ class MongoDal:
                 self.logger.debug('completed init()')
 
     def close(self):
-        if(None is not self.client):
+        if None is not self.client:
             self.client.close()
 
     def insert_doc(self, doc):
         self.logger.debug('started insert_doc')
-        id = ObjectId()
-        doc.update({'_id': id})
-        #TODO RETRY and ERROR HANDLE
+        if '_id' not in doc:
+            self.logger.debug('doc does not have _id: %s', doc)
+            doc['_id'] = ObjectId()
         try:
+            self.logger.debug('attempting insert')
             self.retry_on_error(
                 self.dalExample.insert_one, doc
             )
@@ -67,9 +68,10 @@ class MongoDal:
         except Exception as e:
             self.logger.error(e)
             self.logger.error('error inserting doc: %s', doc)
+            raise #TODO raise new dal-type errors or raise pymongo error?
         else:
             self.logger.debug('completed insertDoc')
-        return id;
+            return doc['_id'];
 
     def get_by_id(self, id):
         self.logger.debug('started get_by_id')
@@ -96,7 +98,6 @@ class MongoDal:
             self.logger.debug('completed delete_all_docs')
 
     def retry_on_error(self, fn, *args):
-        val = None
         try:
             val = fn(*args) #TODO put return statement here?
         except AutoReconnect as e1: #NetworkError
@@ -108,8 +109,9 @@ class MongoDal:
             except: #TODO make exact errors?
                 self.logger.error('could not resolve with retry')
                 raise
-        except: #TODO make exact errors?
-            self.logger.debug('error is not retryable')
+        #catching all exceptions to log. Raises them to be handled appropriately.
+        except Exception as e: 
+            self.logger.error('error is not retryable: %s', e)
             raise
-        if(None is not val):
+        else:
             return val

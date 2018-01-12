@@ -47,8 +47,22 @@ class MongoDalTest(unittest.TestCase):
         self.assertTrue(isinstance(id, ObjectId))
         self.logger.debug('----------testInsertingOneDoc----------\n')
 
+    def testRejectDuplicateKeys(self):
+        self.logger.debug('----------testRejectDuplicateKeys----------')
+        testDoc1 = {'test': True}
+        #TODO: Error Handle
+        id1 = self.dal.insert_doc(testDoc1)
+        testDoc2 = {'_id': id1, 'test': True}
+        try:
+            id2 = self.dal.insert_doc(testDoc2)
+        except Exception as e:
+            self.logger.debug('successfully caught error while inserting with duplicate key: %s',e)
+            self.assertTrue(True)
+        else:
+            self.fail('should reject if inserting duplicate keys')
+        self.logger.debug('----------testRejectDuplicateKeys----------\n')
+
     def testGetById(self):
-        #self.skipTest('not implemented yet')
         self.logger.debug('----------testGetById----------')
         testDoc = {'test': True}
         id = self.dal.insert_doc(testDoc)
@@ -66,6 +80,9 @@ class MongoDalTest(unittest.TestCase):
         doc = self.dal.get_by_id(id)
         self.assertEquals(1, doc.counter)
         self.logger.debug('----------testIncCounter----------\n')
+
+    def testNewTestCase(self):
+        self.skipTest('not implemented yet')
 
 if __name__ == '__main__':
     unittest.main()
