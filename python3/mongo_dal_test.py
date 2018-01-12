@@ -21,7 +21,7 @@ class MongoDalTest(unittest.TestCase):
         #connect to MongoDB
         cls.logger.debug('----------setUpClass----------')
         cls.dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', logging.DEBUG)
-        cls.dal.init()
+        cls.dal.connect()
         cls.logger.debug('----------setUpClass----------\n')
 
     @classmethod
