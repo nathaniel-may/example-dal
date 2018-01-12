@@ -74,20 +74,20 @@ class MongoDal:
     def get_by_id(self, id):
         self.logger.debug('started get_by_id')
         try:
-            retry_on_error(
-                doc = self.dalExample.find_one, {'_id': id}
+            doc = self.retry_on_error(
+                self.dalExample.find_one, {'_id': id}
             )
-        except: #TODO make exact errors?
-            self.logger.error('error while getting by id')
+        except Exception as e: #TODO make exact errors?
+            self.logger.error('error while getting by id: %s', e)
         else:
             self.logger.debug('completed get_by_id')
-            return doc
+            return doc #TODO does doc always exist here?
 
 
     def delete_all_docs(self):
         self.logger.debug('started delete_all_docs')
         try:  
-            retry_on_error(
+            self.retry_on_error(
                 self.dalExample.delete_many, {}
             )
         except: #TODO make exact errors?
