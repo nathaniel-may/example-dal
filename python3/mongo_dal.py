@@ -24,34 +24,35 @@ class MongoDal:
 
         #set variables for connecting to mongo
         self.connString = connString
-        self.client = None
         self.logger.debug('completed __init__')
 
     def connect(self):
         #connect to mongodb
         self.logger.debug('started init()')
-        if self.client is None:
+        if not hasattr(self, 'client'):
             self.logger.info('setting up the connection')
             self.client = MongoClient(self.connString, 
                 serverSelectionTimeoutMS=10) #TODO seconds or milliseconds?
             db = self.client.pydal
             #test connection and error handle results
             try:
-                self.logger.debug('testing connection to replica set')
+                self.logger.debug('testing connection to mongodb')
                 self.client.server_info()
             except ConnectionFailure as e:
                 self.logger.fatal('Connection refused to %s. with conn string ', self.connString)
-                client = None
+                del client
             except ServerSelectionTimeoutError as e:
                 self.logger.fatal('Server selection timeout to %s. with conn string ', self.connString)
-                client = None
+                del client
             else:
                 #create all collections
                 self.dalExample = db.example
                 self.logger.debug('completed init()')
+        else:
+            self.logger.debug('client is already connected')
 
     def close(self):
-        if None is not self.client:
+        if not hasattr(self, 'client'):
             self.client.close()
 
     def insert_doc(self, doc):
