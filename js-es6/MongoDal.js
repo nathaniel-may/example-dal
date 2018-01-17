@@ -268,7 +268,7 @@ class MongoDal{
         }
         //the error is not a network error or an interrupt error and is therefore not retryable
         else{
-          this.logger.debug(new Date() + ' ' + this.logModule + ' error is not retryable: ' + err);
+          this.logger.error(new Date() + ' ' + this.logModule + ' error is not retryable: ' + err);
           reject(err);
         }
       });

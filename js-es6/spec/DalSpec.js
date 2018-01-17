@@ -25,8 +25,8 @@ class CallTracker{
   netErr(){
     this.called++;
     return new Promise((resolve, reject) => {
-      let err = new MongoError();
-      err.code = 9001; //socket exception
+      let err = new MongoError('socketException');
+      err.code = 9001;
 
       //network error on first call
       if(this.called == 1){
@@ -42,10 +42,10 @@ class CallTracker{
   netErrThenDupKey(){
     this.called++;
     return new Promise((resolve, reject) => {
-      let netErr = new MongoError();
+      let netErr = new MongoError('socketException');
       netErr.code = 9001; //socket exception
 
-      let dupKeyErr = new MongoError();
+      let dupKeyErr = new MongoError('duplicateKeyError');
       dupKeyErr.code = 11000;
 
       //network error on first call
@@ -61,9 +61,9 @@ class CallTracker{
 
   dupKeyErr(){
     return new Promise((resolve, reject) => {
-      let err = new MongoError();
-      err.code = 11000;
-      reject(err);
+      let dupKeyErr = new MongoError('duplicateKeyError');
+      dupKeyErr.code = 11000;
+      reject(dupKeyErr);
     })
   }
 
@@ -349,7 +349,7 @@ describe('MongoDal', () => {
         return new Promise((resolve, reject) => {
           this.called++;
 
-          let sockErr = new MongoError();
+          let sockErr = new MongoError('socketError');
           sockErr.code = 9001;
           
           if(this.called == 1){
