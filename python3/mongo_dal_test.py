@@ -50,7 +50,6 @@ class MongoDalTest(unittest.TestCase):
     def testRejectDuplicateKeys(self):
         self.logger.debug('----------testRejectDuplicateKeys----------')
         testDoc1 = {'test': True}
-        #TODO: Error Handle
         id1 = self.dal.insert_doc(testDoc1)
         testDoc2 = {'_id': id1, 'test': True}
         try:
@@ -66,19 +65,22 @@ class MongoDalTest(unittest.TestCase):
         self.logger.debug('----------testGetById----------')
         testDoc = {'test': True}
         id = self.dal.insert_doc(testDoc)
+        self.logger.debug('inserted doc')
         doc = self.dal.get_by_id(id)
+        self.logger.debug('read doc')
         self.assertEqual(id, testDoc['_id'])
         self.assertEqual(doc['test'], testDoc['test'])
         self.logger.debug('----------testGetById----------\n')
 
     def testIncCounter(self):
-        self.skipTest('not implemented yet')
+        #self.skipTest('not implemented yet')
         self.logger.debug('----------testIncCounter----------')
-        testDoc = {counter: 0}
+        testDoc = {'counter': 0}
         id = self.dal.insert_doc(testDoc)
-        self.dal.inc_counter()
+        self.dal.inc_counter(id)
+        self.dal.inc_counter(id)
         doc = self.dal.get_by_id(id)
-        self.assertEquals(1, doc.counter)
+        self.assertEquals(2, doc['counter'])
         self.logger.debug('----------testIncCounter----------\n')
 
     def testNewTestCase(self):

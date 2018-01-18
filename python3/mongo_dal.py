@@ -32,9 +32,9 @@ class MongoDal:
         if not hasattr(self, 'client'):
             self.logger.info('setting up the connection')
             self.client = MongoClient(self.connString, 
-                serverSelectionTimeoutMS=10) #TODO seconds or milliseconds?
+                w='majority')
             db = self.client.pydal
-            #test connection and error handle results
+            #test connection and error handle results. won't catch bad write concern option.
             try:
                 self.logger.debug('testing connection to mongodb')
                 self.client.server_info()
@@ -86,6 +86,28 @@ class MongoDal:
             self.logger.debug('completed get_by_id')
             return doc #TODO does doc always exist here?
 
+    def inc_counter(self, id):
+        self.logger.debug('started incCounter')
+        opid = ObjectId()
+        try:
+            self.retry_on_error(
+                self.dalExample.find_one_and_update(
+                #query by id and that this operation hasn't been completed already
+                {'_id': id, 'opids': {'$ne': opid}},
+                #increment the counter and add the opid for this operation into the opids array
+                #slice the oldest elements out of the array if it is too large
+                {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
+                #don't bring back the whole document which includes the list of opids
+                #only return the new counter value for logging purposes
+                projection={'projection': {'counter': 1, '_id':0}, 'w':'majority'}),
+                return_document=ReturnDocument.AFTER
+            )
+        except Exception as e: 
+            self.logger.error('failed to increment the counter: ', e)
+        else:
+            self.logger.debug('completed incCounter')
+            return
+
 
     def delete_all_docs(self):
         self.logger.debug('started delete_all_docs')
@@ -107,7 +129,7 @@ class MongoDal:
                 val = fn(*args) #TODO put return statement here?
             except DuplicateKeyError as e2:
                 self.logger.debug('retry resolved network error')
-            except: #TODO make exact errors?
+            except Exception: #TODO make exact errors?
                 self.logger.error('could not resolve with retry')
                 raise
         #catching all exceptions to log. Raises them to be handled appropriately.
