@@ -120,4 +120,4 @@ python3 ./mongo_dal_test.py
 
 ## License
 
-TODO: Figure out the licensing
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
