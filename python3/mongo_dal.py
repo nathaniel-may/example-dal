@@ -67,12 +67,12 @@ class MongoDal:
             self.retry_on_error(
                 self.dalExample.insert_one, doc
             )
-        #TODO remove blanket catch
         except DuplicateKeyError:
             raise DuplicateIdError(doc['_id'])
+        #log any other errors
         except Exception as e:
             self.logger.error('error while inserting doc: %s, err: %s', doc, e)
-            raise #TODO raise new dal-type errors or raise pymongo error?
+            raise
         else:
             self.logger.debug('completed insert_doc')
             return doc['_id'];
@@ -83,7 +83,8 @@ class MongoDal:
             doc = self.retry_on_error(
                 self.dalExample.find_one, {'_id': id}
             )
-        except Exception as e: #TODO make exact errors?
+        #log unexpected errors
+        except Exception as e:
             self.logger.error('error while getting by id: %s', e)
         else:
             self.logger.debug('completed get_by_id')
@@ -122,21 +123,23 @@ class MongoDal:
             self.retry_on_error(
                 self.dalExample.delete_many, {}
             )
-        except: #TODO make exact errors?
+        #log unexpected errors
+        except:
             self.logger.error('error while getting by id')
         else:
             self.logger.debug('completed delete_all_docs')
 
     def retry_on_error(self, fn, *args, **kwargs):
         try:
-            val = fn(*args, **kwargs) #TODO put return statement here?
-        except AutoReconnect as e1: #NetworkError
+            val = fn(*args, **kwargs)
+        except AutoReconnect as e1: #NetworkError base class
             self.logger.debug('experienced network error- retrying')
             try:
-                val = fn(*args) #TODO put return statement here?
+                val = fn(*args)
             except DuplicateKeyError as e2:
                 self.logger.debug('retry resolved network error')
-            except Exception: #TODO make exact errors?
+            #log unexpected errors
+            except Exception:
                 self.logger.error('could not resolve with retry')
                 raise
         #catching all exceptions to log. Raises them to be handled appropriately.
