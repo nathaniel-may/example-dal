@@ -97,6 +97,13 @@ To install the mongodb driver run
 python3 -m pip install pymongo
 ```
 
+Before running the tests, be sure a replica set is up with nodes running at the following addresses:
+```
+localhost:27017
+localhost:27018
+localhost:27019
+``` 
+
 To run the unit tests run
 ```
 python3 ./mongo_dal_test.py
