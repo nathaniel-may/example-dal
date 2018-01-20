@@ -34,9 +34,9 @@ class MongoDal:
         if not hasattr(self, 'client'):
             self.logger.info('setting up the connection')
             self.client = MongoClient(self.connString, 
-                w='majority')
+                                      w='majority')
             db = self.client.pydal
-            #test connection and error handle results. won't catch bad write concern option.
+            #test connection and error handle results. won't catch bad write concern option until a write is attempted.
             try:
                 self.logger.debug('testing connection to mongodb')
                 self.client.server_info()
@@ -44,7 +44,7 @@ class MongoDal:
                 self.logger.fatal('Connection refused to %s. with conn string ', self.connString)
                 del client
             except ServerSelectionTimeoutError as e:
-                self.logger.fatal('Server selection timeout to %s. with conn string ', self.connString)
+                self.logger.fatal('Server selection timeout. Are these servers available: %s', self.connString)
                 del client
             else:
                 #create all collections
@@ -67,10 +67,11 @@ class MongoDal:
             self.retry_on_error(
                 self.dalExample.insert_one, doc
             )
-        #TODO remote blanket catch
+        #TODO remove blanket catch
+        except DuplicateKeyError:
+            raise DuplicateIdError(doc['_id'])
         except Exception as e:
-            self.logger.error(e)
-            self.logger.error('error inserting doc: %s', doc)
+            self.logger.error('error while inserting doc: %s, err: %s', doc, e)
             raise #TODO raise new dal-type errors or raise pymongo error?
         else:
             self.logger.debug('completed insert_doc')
@@ -86,13 +87,14 @@ class MongoDal:
             self.logger.error('error while getting by id: %s', e)
         else:
             self.logger.debug('completed get_by_id')
-            return doc #TODO does doc always exist here?
+            return doc
 
     def inc_counter(self, id):
         self.logger.debug('started incCounter')
+        #create a unique id to represent this particular increment operation
         opid = ObjectId()
         try:
-            self.retry_on_error(
+            newCount = self.retry_on_error(
                 self.dalExample.find_one_and_update,
                 #query by id and that this operation hasn't been completed already
                 {'_id': id, 'opids': {'$ne': opid}},
@@ -107,8 +109,10 @@ class MongoDal:
         except Exception as e: 
             self.logger.error('failed to increment the counter: ', e)
         else:
-            #TODO log the new counter number
-            self.logger.debug('completed incCounter')
+            #newCount might be None if the operation was successful on the first try
+            #but resulted in a network error. The retry will not match the document and will not return the new count
+            #query the document to get an accurate count
+            self.logger.debug('completed incCounter. Current value=%s',newCount)
             return
 
 
@@ -141,3 +145,20 @@ class MongoDal:
             raise
         else:
             return val
+
+class Error(Exception):
+    '''Base class for exceptions'''
+    pass
+
+class DuplicateIdError(Error):
+    '''Exception raised when attempting to insert a document which contains
+       an _id which is already present in the collection
+
+    Attributes:
+        id -- the id which caused the error
+        message -- generated explanation of the error
+    '''
+
+    def __init__(self, id):
+        self.id = id
+        self.message = 'id {0} already present in collection'.format(self.id)

@@ -1,4 +1,5 @@
 from mongo_dal import MongoDal
+from mongo_dal import DuplicateIdError
 from bson.objectid import ObjectId
 from datetime import datetime
 import unittest
@@ -73,7 +74,6 @@ class MongoDalTest(unittest.TestCase):
         self.logger.debug('----------testGetById----------\n')
 
     def testIncCounter(self):
-        #self.skipTest('not implemented yet')
         self.logger.debug('----------testIncCounter----------')
         testDoc = {'counter': 0}
         id = self.dal.insert_doc(testDoc)
@@ -82,6 +82,13 @@ class MongoDalTest(unittest.TestCase):
         doc = self.dal.get_by_id(id)
         self.assertEqual(2, doc['counter'])
         self.logger.debug('----------testIncCounter----------\n')
+
+    def testRaisesDuplicateIdError(self):
+        self.logger.debug('----------testRaisesDuplicateIdError----------')
+        testDoc = {'test': True}
+        id = self.dal.insert_doc(testDoc)
+        testDoc2 = {'_id': id, 'test': True}
+        self.assertRaises(DuplicateIdError, self.dal.insert_doc, testDoc2)
 
     def testNewTestCase(self):
         self.skipTest('not implemented yet')
