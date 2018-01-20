@@ -80,7 +80,7 @@ class MongoDalTest(unittest.TestCase):
         self.dal.inc_counter(id)
         self.dal.inc_counter(id)
         doc = self.dal.get_by_id(id)
-        self.assertEquals(2, doc['counter'])
+        self.assertEqual(2, doc['counter'])
         self.logger.debug('----------testIncCounter----------\n')
 
     def testNewTestCase(self):

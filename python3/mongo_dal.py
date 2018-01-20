@@ -3,6 +3,8 @@ from pymongo.errors import ConnectionFailure
 from pymongo.errors import ServerSelectionTimeoutError
 from pymongo.errors import DuplicateKeyError
 from pymongo.errors import AutoReconnect
+from pymongo import ReturnDocument
+from pymongo.write_concern import WriteConcern
 
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -46,7 +48,7 @@ class MongoDal:
                 del client
             else:
                 #create all collections
-                self.dalExample = db.example
+                self.dalExample = db.get_collection('example', write_concern=WriteConcern(w='majority', wtimeout=10000, j=True))
                 self.logger.debug('completed init()')
         else:
             self.logger.debug('client is already connected')
@@ -71,7 +73,7 @@ class MongoDal:
             self.logger.error('error inserting doc: %s', doc)
             raise #TODO raise new dal-type errors or raise pymongo error?
         else:
-            self.logger.debug('completed insertDoc')
+            self.logger.debug('completed insert_doc')
             return doc['_id'];
 
     def get_by_id(self, id):
@@ -91,7 +93,7 @@ class MongoDal:
         opid = ObjectId()
         try:
             self.retry_on_error(
-                self.dalExample.find_one_and_update(
+                self.dalExample.find_one_and_update,
                 #query by id and that this operation hasn't been completed already
                 {'_id': id, 'opids': {'$ne': opid}},
                 #increment the counter and add the opid for this operation into the opids array
@@ -99,12 +101,13 @@ class MongoDal:
                 {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
                 #don't bring back the whole document which includes the list of opids
                 #only return the new counter value for logging purposes
-                projection={'projection': {'counter': 1, '_id':0}, 'w':'majority'}),
+                projection={'counter': True, '_id':False},
                 return_document=ReturnDocument.AFTER
             )
         except Exception as e: 
             self.logger.error('failed to increment the counter: ', e)
         else:
+            #TODO log the new counter number
             self.logger.debug('completed incCounter')
             return
 
@@ -120,9 +123,9 @@ class MongoDal:
         else:
             self.logger.debug('completed delete_all_docs')
 
-    def retry_on_error(self, fn, *args):
+    def retry_on_error(self, fn, *args, **kwargs):
         try:
-            val = fn(*args) #TODO put return statement here?
+            val = fn(*args, **kwargs) #TODO put return statement here?
         except AutoReconnect as e1: #NetworkError
             self.logger.debug('experienced network error- retrying')
             try:
