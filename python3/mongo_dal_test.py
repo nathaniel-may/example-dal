@@ -69,8 +69,9 @@ class MongoDalTest(unittest.TestCase):
         self.logger.debug('inserted doc')
         doc = self.dal.get_by_id(id)
         self.logger.debug('read doc')
-        self.assertEqual(id, testDoc['_id'])
+        self.assertEqual(id, doc['_id'])
         self.assertEqual(doc['test'], testDoc['test'])
+        self.assertEqual({*doc}, {'_id', 'test'})
         self.logger.debug('----------testGetById----------\n')
 
     def testIncCounter(self):

@@ -1,11 +1,6 @@
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
-from pymongo.errors import ServerSelectionTimeoutError
-from pymongo.errors import DuplicateKeyError
-from pymongo.errors import AutoReconnect
-from pymongo import ReturnDocument
+from pymongo import MongoClient, ReturnDocument
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, DuplicateKeyError, AutoReconnect
 from pymongo.write_concern import WriteConcern
-
 from bson.objectid import ObjectId
 from datetime import datetime
 import logging.config
@@ -33,20 +28,20 @@ class MongoDal:
         self.logger.debug('started init()')
         if not hasattr(self, 'client'):
             self.logger.info('setting up the connection')
-            self.client = MongoClient(self.connString, 
+            client = MongoClient(self.connString, 
                                       w='majority')
-            db = self.client.pydal
+            db = client.pydal
             #test connection and error handle results. won't catch bad write concern option until a write is attempted.
             try:
                 self.logger.debug('testing connection to mongodb')
-                self.client.server_info()
+                client.server_info()
             except ConnectionFailure as e:
                 self.logger.fatal('Connection refused to %s. with conn string ', self.connString)
-                del client
             except ServerSelectionTimeoutError as e:
                 self.logger.fatal('Server selection timeout. Are these servers available: %s', self.connString)
-                del client
             else:
+                #connection succeeded
+                self.client = client
                 #create all collections
                 self.dalExample = db.get_collection('example', write_concern=WriteConcern(w='majority', wtimeout=10000, j=True))
                 self.logger.debug('completed init()')
@@ -54,14 +49,16 @@ class MongoDal:
             self.logger.debug('client is already connected')
 
     def close(self):
-        if not hasattr(self, 'client'):
+        if hasattr(self, 'client'):
             self.client.close()
 
     def insert_doc(self, doc):
         self.logger.debug('started insert_doc')
         if '_id' not in doc:
             self.logger.debug('doc does not have _id: %s', doc)
-            doc['_id'] = ObjectId()
+            #don't mutate their object
+            doc = {**doc, '_id': ObjectId()}
+
         try:
             self.logger.debug('attempting insert')
             self.retry_on_error(
@@ -69,8 +66,11 @@ class MongoDal:
             )
         except DuplicateKeyError:
             raise DuplicateIdError(doc['_id'])
-        #log any other errors
+        #TODO
+        #catch all mongo exceptions and return internal DAL error
+        #raise all other errors that aren't mongo specific
         except Exception as e:
+            #log any other errors
             self.logger.error('error while inserting doc: %s, err: %s', doc, e)
             raise
         else:
@@ -83,9 +83,11 @@ class MongoDal:
             doc = self.retry_on_error(
                 self.dalExample.find_one, {'_id': id}
             )
+        #TODO ^^^
         #log unexpected errors
         except Exception as e:
             self.logger.error('error while getting by id: %s', e)
+            raise
         else:
             self.logger.debug('completed get_by_id')
             return doc
@@ -107,14 +109,15 @@ class MongoDal:
                 projection={'counter': True, '_id':False},
                 return_document=ReturnDocument.AFTER
             )
+        #TODO ^^^
         except Exception as e: 
             self.logger.error('failed to increment the counter: ', e)
+            raise
         else:
             #newCount might be None if the operation was successful on the first try
             #but resulted in a network error. The retry will not match the document and will not return the new count
             #query the document to get an accurate count
             self.logger.debug('completed incCounter. Current value=%s',newCount)
-            return
 
 
     def delete_all_docs(self):
@@ -123,19 +126,21 @@ class MongoDal:
             self.retry_on_error(
                 self.dalExample.delete_many, {}
             )
+        #TODO ^^^
         #log unexpected errors
         except:
             self.logger.error('error while getting by id')
+            raise
         else:
             self.logger.debug('completed delete_all_docs')
 
     def retry_on_error(self, fn, *args, **kwargs):
         try:
-            val = fn(*args, **kwargs)
+            return fn(*args, **kwargs)
         except AutoReconnect as e1: #NetworkError base class
             self.logger.debug('experienced network error- retrying')
             try:
-                val = fn(*args)
+                return fn(*args, **kwargs)
             except DuplicateKeyError as e2:
                 self.logger.debug('retry resolved network error')
             #log unexpected errors
@@ -146,8 +151,6 @@ class MongoDal:
         except Exception as e: 
             self.logger.error('error is not retryable: %s', e)
             raise
-        else:
-            return val
 
 class Error(Exception):
     '''Base class for exceptions'''
