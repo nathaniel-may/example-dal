@@ -67,18 +67,14 @@ class MongoDal{
     });
   }
 
-  insertDoc(docIn){
+  insertDoc(doc){
     return new Promise((resolve, reject) => {
-      this.logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called with doc ' + JSON.stringify(docIn));
-
-      //creating a deep copy to avoid modifying in the previous scope
-      //note that Date() objects become type ISODate which is OK for MongoDB
-      let doc = JSON.parse(JSON.stringify(docIn));
+      this.logger.debug(new Date() + ' ' + this.logModule + ' insertDoc function called with doc ' + JSON.stringify(doc));
 
       //assigning an id allows for safe retries of inserts
       //the duplicate key exception prevents multiple inserts
-      if(undefined == typeof doc._id){
-        doc._id = new ObjectId();
+      if(!('_id' in doc)){
+        doc = {...doc, _id: new ObjectId()}
       }
 
       //define the function inserting the doc with a write concern of majority
