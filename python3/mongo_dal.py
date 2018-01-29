@@ -1,8 +1,6 @@
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import PyMongoError, ConnectionFailure, ServerSelectionTimeoutError, DuplicateKeyError, AutoReconnect
-from pymongo import ReturnDocument
 from pymongo.write_concern import WriteConcern
-
 from bson.objectid import ObjectId
 from datetime import datetime
 import logging.config
@@ -17,7 +15,7 @@ class MongoDal:
         self.logger.setLevel(logLevel)
         handler = logging.StreamHandler()
         handler.setLevel(logLevel)
-        formatter = logging.Formatter('%(asctime)s\t%(name)s\t\t%(levelname)s::%(message)s', datefmt='%m/%d/%Y %H:%M:{!s}')
+        formatter = logging.Formatter('%(asctime)s\t%(name)s\t\t%(levelname)s::%(message)s', datefmt='%m/%d/%Y %H:%M:%S')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
@@ -32,27 +30,27 @@ class MongoDal:
             self.logger.debug('client is already connected')
         else:
             self.logger.info('setting up the connection')
-            self.client = MongoClient(self.connString, 
+            client = MongoClient(self.connString, 
                                       w='majority')
-            db = self.client.pydal
+            db = client.pydal
             #test connection and error handle results. won't catch bad write concern option until a write is attempted.
             try:
                 self.logger.debug('testing connection to mongodb')
-                self.client.server_info()
+                client.server_info()
                 #create all collections
                 self.dalExample = db.get_collection('example', write_concern=WriteConcern(w='majority', wtimeout=10000, j=True))
+                #client is connected. assign to complete singleton
+                self.client = client
                 self.logger.debug('completed init()')
             except ConnectionFailure as e:
                 self.logger.fatal('Connection refused to {!s}.'.format(self.connString))
-                del client
             except ServerSelectionTimeoutError as e:
                 self.logger.fatal('Server selection timeout. Are these servers reachable? {!s}'.format(self.connString))
-                del client
             except PyMongoError as e:
-                self.logger.fatal('error connecting: ', e)
+                self.logger.fatal('error connecting: {!s}'.format(e))
                 raise WrappedError(e)
             except Exception as e:
-                self.logger.fatal('error connecting: ', e)
+                self.logger.fatal('error connecting: {!s}'.format(e))
                 raise
 
     def close(self):
@@ -61,17 +59,19 @@ class MongoDal:
                 self.client.close()
                 self.logger.debug('client closed')
             except PyMongoError as e:
-                self.logger.error('error closing client: ', e)
+                self.logger.error('error closing client: {!s}'.format(e))
                 raise WrappedError(e)
             except Exception:
-                self.logger.error('error closing client: ', e)
+                self.logger.error('error closing client: {!s}'.format(e))
                 raise
 
     def insert_doc(self, doc):
         self.logger.debug('started insert_doc')
         if '_id' not in doc:
-            self.logger.debug('doc does not have _id: ', doc)
-            doc['_id'] = ObjectId()
+            self.logger.debug('doc does not have _id: {!s}'.format(doc))
+            #don't mutate their object
+            doc = {**doc, '_id': ObjectId()}
+
         try:
             self.logger.debug('attempting insert')
             self.retry_on_error(
@@ -83,7 +83,7 @@ class MongoDal:
             self.logger.error('DuplicateKeyError while inserting doc. id: {id!s}'.format(id=doc['_id']))
             raise DuplicateIdError(doc['_id'])
         except PyMongoError as e:
-            self.logger.error('error while inserting doc: ', e)
+            self.logger.error('error while inserting doc: {!s}'.format(e))
             raise WrappedError(e)
         except Exception as e:
             self.logger.error('error while inserting doc: {doc!s}, err: {e!s}'.format(doc=doc, e=e))
@@ -124,12 +124,12 @@ class MongoDal:
             #newCount might be None if the operation was successful on the first try
             #but resulted in a network error. The retry will not match the document and will not return the new count
             #query the document to get an accurate count
-            self.logger.debug('completed incCounter. Current value={count!s}'.format(count=newCount))
+            self.logger.debug('completed incCounter. Current doc is {count!s}'.format(count=newCount))
         except PyMongoError as e:
-            self.logger.error('failed to increment the counter: ', e)
+            self.logger.error('failed to increment the counter: {!s}'.format(e))
             raise WrappedError(e)
         except Exception as e: 
-            self.logger.error('failed to increment the counter: ', e)
+            self.logger.error('failed to increment the counter: {!s}'.format(e))
 
 
     def delete_all_docs(self):
@@ -140,19 +140,19 @@ class MongoDal:
             )
             self.logger.debug('completed delete_all_docs')
         except PyMongoError as e:
-            self.logger.error('error deleting_all_docs: ', e)
+            self.logger.error('error deleting_all_docs: {!s}'.format(e))
             raise WrappedError(e)
         except Exception as e:
-            self.logger.error('error deleting_all_docs: ', e)
+            self.logger.error('error deleting_all_docs: {!s}'.format(e))
             raise
 
     def retry_on_error(self, fn, *args, **kwargs):
         try:
-            val = fn(*args, **kwargs)
+            return fn(*args, **kwargs)
         except AutoReconnect as netErr: #NetworkError base class
             self.logger.debug('experienced network error- retrying')
             try:
-                val = fn(*args)
+                return fn(*args, **kwargs)
             #the only way for a duplicate key error to happen here is if the first insert succeeded
             except DuplicateKeyError as e:
                 self.logger.debug('retry resolved network error')
@@ -163,8 +163,6 @@ class MongoDal:
         except Exception as e: 
             self.logger.error('error is not retryable: {!s}'.format(e))
             raise
-        else:
-            return val
 
 #Custom mongo_dal errors so higher functions don't need to catch pymongo-specific errors          
 class DatabaseError(Exception):
@@ -182,10 +180,10 @@ class DuplicateIdError(DatabaseError):
 
     def __init__(self, id):
         self.id = id
-        self.message = 'id {0} already present in collection'.format(self.id)
+        self.message = 'id {!s} already present in collection'.format(self.id)
 
 class WrappedError(DatabaseError):
     '''Exception wraps any unexpected pymongo errors before raising'''
     def __init__(self, err):
-        self.message = 'pymongo error raised: {0}'.format(err)
+        self.message = 'pymongo error raised: {!s}'.format(err)
 
