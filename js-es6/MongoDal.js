@@ -117,25 +117,23 @@ class MongoDal{
   };
 
   countCol(){
-    return new Promise((resolve, reject) => {
-      this.logger.silly(new Date() + ' ' + this.logModule + ' countCol function called');
+    this.logger.silly(new Date() + ' ' + this.logModule + ' countCol function called');
 
-      //define the function return the collection count. the query comment helps with debugging
-      //if this operation appears in slow query logs. this operation can be safely retried.
-      let fn = () => {
-        return this.dalExample.find({}).comment('countCol from MongoDal.js').count();
-      };
+    //define the function return the collection count. the query comment helps with debugging
+    //if this operation appears in slow query logs. this operation can be safely retried.
+    let fn = () => {
+      return this.dalExample.find({}).comment('countCol from MongoDal.js').count();
+    };
 
-      //call the function with retry logic
-      this._retryOnErr(fn).then((count) => {
-        this.logger.debug(new Date() + ' ' + this.logModule + ' collection count is ' + count);
-        resolve(count);
-      })
-      .catch((err) => {
-        this.logger.error(new Date() + ' ' + this.logModule + ' error counting collection: ' + err);
-        reject(err);
-      });
+    //call the function with retry logic
+    return this._retryOnErr(fn).then((count) => {
+      this.logger.debug(new Date() + ' ' + this.logModule + ' collection count is ' + count);
+      return count;
     })
+    .catch((err) => {
+      this.logger.error(new Date() + ' ' + this.logModule + ' error counting collection: ' + err);
+      throw err;
+    });
   }
 
   //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
@@ -192,24 +190,21 @@ class MongoDal{
   }
 
   deleteAllDocs(){
-    return new Promise((resolve, reject) => {
-      this.logger.silly(new Date() + ' ' + this.logModule + ' deleteAllDocs called');
+    this.logger.silly(new Date() + ' ' + this.logModule + ' deleteAllDocs called');
 
-      //define the function to delete all documents with write concern majority
-      //this operation can be safely retried
-      let fn = () => {
-        return this.dalExample.deleteMany({}, {w:'majority'});
-      };
+    //define the function to delete all documents with write concern majority
+    //this operation can be safely retried
+    let fn = () => {
+      return this.dalExample.deleteMany({}, {w:'majority'});
+    };
 
-      //call the function with retry logic
-      this._retryOnErr(fn).then(() => {
-        this.logger.debug(new Date() + ' ' + this.logModule + ' deleted all docs');
-        resolve();
-      })
-      .catch((err) => {
-        this.logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
-        reject(err);
-      });
+    //call the function with retry logic
+    return this._retryOnErr(fn).then(() => {
+      this.logger.debug(new Date() + ' ' + this.logModule + ' deleted all docs');
+    })
+    .catch((err) => {
+      this.logger.error(new Date() + ' ' + this.logModule + ' error getting by id');
+      throw err;
     });
   }
 
