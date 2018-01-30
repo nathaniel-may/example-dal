@@ -1,6 +1,7 @@
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import PyMongoError, ConnectionFailure, ServerSelectionTimeoutError, DuplicateKeyError, AutoReconnect
 from pymongo.write_concern import WriteConcern
+from pymongo.read_concern import ReadConcern
 from bson.objectid import ObjectId
 from datetime import datetime
 import logging.config
@@ -30,15 +31,27 @@ class MongoDal:
             self.logger.debug('client is already connected')
         else:
             self.logger.info('setting up the connection')
-            client = MongoClient(self.connString, 
-                                      w='majority')
+            '''here write concern is set on the whole client. This can also be set on the following levels:
+               - connection string
+               - client connection
+               - database
+               - collection
+               - operation
+            '''
+            client = MongoClient(self.connString,
+                                 w='majority')
             db = client.pydal
             #test connection and error handle results. won't catch bad write concern option until a write is attempted.
             try:
                 self.logger.debug('testing connection to mongodb')
                 client.server_info()
                 #create all collections
-                self.dalExample = db.get_collection('example', write_concern=WriteConcern(w='majority', wtimeout=10000, j=True))
+                #write concern here is redundant since it is also set on the client
+                self.dalExample = db.get_collection('example',
+                                                    write_concern=WriteConcern(w='majority', wtimeout=10000, j=True))
+                self.dalExampleReadMaj = db.get_collection('example', 
+                                                           write_concern=WriteConcern(w='majority', wtimeout=10000, j=True), 
+                                                           read_concern=ReadConcern(level='majority'))
                 #client is connected. assign to complete singleton
                 self.client = client
                 self.logger.debug('completed init()')
@@ -93,7 +106,8 @@ class MongoDal:
         self.logger.debug('started get_by_id')
         try:
             doc = self.retry_on_error(
-                self.dalExample.find_one, {'_id': id}
+                #uses the collection with read concern majority
+                self.dalExampleReadMaj.find_one, {'_id': id}
             )
             self.logger.debug('completed get_by_id')
             return doc
@@ -183,7 +197,12 @@ class DuplicateIdError(DatabaseError):
         self.message = 'id {!s} already present in collection'.format(self.id)
 
 class WrappedError(DatabaseError):
-    '''Exception wraps any unexpected pymongo errors before raising'''
+    '''Exception wraps any unexpected pymongo errors before raising
+
+    Attributes:
+        err -- the original error being wrapped
+        message -- generated explanation of the error
+    '''
     def __init__(self, err):
         self.message = 'pymongo error raised: {!s}'.format(err)
 
