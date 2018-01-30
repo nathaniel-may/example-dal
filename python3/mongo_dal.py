@@ -7,7 +7,9 @@ from datetime import datetime
 import logging.config
 
 class MongoDal:
-    '''example functions for accessing mongodb'''
+    ''' example functions for accessing mongodb
+        all operations are idempotent so they can be safely retried in the face of network errors
+    '''
 
     def __init__(self, connString, logLevel):
 
@@ -80,6 +82,7 @@ class MongoDal:
 
     def insert_doc(self, doc):
         self.logger.debug('started insert_doc')
+        #assign an _id app-side so the operation can be safely retried
         if '_id' not in doc:
             self.logger.debug('doc does not have _id: {!s}'.format(doc))
             #don't mutate their object
@@ -118,6 +121,8 @@ class MongoDal:
             self.logger.error('error while getting by id: {!s}'.format(e))
             raise
 
+    # this uses the algorithm outlined here to achieve idempotency: 
+    # https://explore.mongodb.com/developer/nathaniel-may
     def inc_counter(self, id):
         self.logger.debug('started incCounter')
         #create a unique id to represent this particular increment operation
@@ -127,23 +132,25 @@ class MongoDal:
                 self.dalExample.find_one_and_update,
                 #query by id and that this operation hasn't been completed already
                 {'_id': id, 'opids': {'$ne': opid}},
-                #increment the counter and add the opid for this operation into the opids array
-                #slice the oldest elements out of the array if it is too large
+                #increment the counter and add the opid for this operation into the opids array to note that it has been completed
+                #slice the oldest elements out of the array if it is too large. should be no smaller than 
+                #the expected number of concurrent updates on this document
                 {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
                 #don't bring back the whole document which includes the list of opids
                 #only return the new counter value for logging purposes
-                projection={'counter': True, '_id':False},
+                projection={'counter': True, '_id': False},
                 return_document=ReturnDocument.AFTER
             )
             #newCount might be None if the operation was successful on the first try
             #but resulted in a network error. The retry will not match the document and will not return the new count
             #query the document to get an accurate count
-            self.logger.debug('completed incCounter. Current doc is {count!s}'.format(count=newCount))
+            self.logger.debug('completed incCounter. Current count is {count!s}'.format(count=newCount['counter']))
         except PyMongoError as e:
             self.logger.error('failed to increment the counter: {!s}'.format(e))
             raise WrappedError(e)
         except Exception as e: 
             self.logger.error('failed to increment the counter: {!s}'.format(e))
+            raise
 
 
     def delete_all_docs(self):
