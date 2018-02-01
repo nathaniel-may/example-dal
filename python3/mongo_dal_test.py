@@ -1,5 +1,5 @@
 from mongo_dal import MongoDal
-from mongo_dal import DuplicateIdError
+from mongo_dal import DbDuplicateIdError
 from bson.objectid import ObjectId
 from datetime import datetime
 import unittest
@@ -89,7 +89,7 @@ class MongoDalTest(unittest.TestCase):
         testDoc = {'test': True}
         id = self.dal.insert_doc(testDoc)
         testDoc2 = {'_id': id, 'test': True}
-        self.assertRaises(DuplicateIdError, self.dal.insert_doc, testDoc2)
+        self.assertRaises(DbDuplicateIdError, self.dal.insert_doc, testDoc2)
 
     def testNewTestCase(self):
         self.skipTest('not implemented yet')
