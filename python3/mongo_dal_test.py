@@ -10,7 +10,6 @@ class MongoDalTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-
         # logging
         cls.logger = logging.getLogger('DAL TEST')
         cls.logger.setLevel(logging.DEBUG)
@@ -45,8 +44,8 @@ class MongoDalTest(unittest.TestCase):
           'subDoc': {'string1': 'str1', 'str2': 'str2'}
         }
         # TODO: Error Handle
-        id = self.dal.insert_doc(test_doc)
-        self.assertTrue(isinstance(id, ObjectId))
+        _id = self.dal.insert_doc(test_doc)
+        self.assertTrue(isinstance(_id, ObjectId))
         self.logger.debug('----------testInsertingOneDoc----------\n')
 
     def testRejectDuplicateKeys(self):
