@@ -5,12 +5,13 @@ from datetime import datetime
 import unittest
 import logging
 
+
 class MongoDalTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
 
-        #logging
+        # logging
         cls.logger = logging.getLogger('DAL TEST')
         cls.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
@@ -19,9 +20,10 @@ class MongoDalTest(unittest.TestCase):
         handler.setFormatter(formatter)
         cls.logger.addHandler(handler)
 
-        #connect to MongoDB
+        # connect to MongoDB
         cls.logger.debug('----------setUpClass----------')
-        cls.dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority', logging.DEBUG)
+        cls.dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
+                           logging.DEBUG)
         cls.dal.connect()
         cls.logger.debug('----------setUpClass----------\n')
 
@@ -34,29 +36,28 @@ class MongoDalTest(unittest.TestCase):
         self.dal.delete_all_docs()
         self.logger.debug('----------tearDown----------\n')
 
-
     def testInsertingOneDoc(self):
         self.logger.debug('----------testInsertingOneDoc----------')
-        testDoc = {
+        test_doc = {
           'string': 'string value',
           'num': 99,
           'array': [1, 2, 3],
           'subDoc': {'string1': 'str1', 'str2': 'str2'}
         }
-        #TODO: Error Handle
-        id = self.dal.insert_doc(testDoc)
+        # TODO: Error Handle
+        id = self.dal.insert_doc(test_doc)
         self.assertTrue(isinstance(id, ObjectId))
         self.logger.debug('----------testInsertingOneDoc----------\n')
 
     def testRejectDuplicateKeys(self):
         self.logger.debug('----------testRejectDuplicateKeys----------')
-        testDoc1 = {'test': True}
-        id1 = self.dal.insert_doc(testDoc1)
-        testDoc2 = {'_id': id1, 'test': True}
+        test_doc1 = {'test': True}
+        id1 = self.dal.insert_doc(test_doc1)
+        test_doc2 = {'_id': id1, 'test': True}
         try:
-            id2 = self.dal.insert_doc(testDoc2)
+            self.dal.insert_doc(test_doc2)
         except Exception as e:
-            self.logger.debug('successfully caught error while inserting with duplicate key: %s',e)
+            self.logger.debug('successfully caught error while inserting with duplicate key: %s', e)
             self.assertTrue(True)
         else:
             self.fail('should reject if inserting duplicate keys')
@@ -64,35 +65,36 @@ class MongoDalTest(unittest.TestCase):
 
     def testGetById(self):
         self.logger.debug('----------testGetById----------')
-        testDoc = {'test': True}
-        id = self.dal.insert_doc(testDoc)
+        test_doc = {'test': True}
+        _id = self.dal.insert_doc(test_doc)
         self.logger.debug('inserted doc')
-        doc = self.dal.get_by_id(id)
+        doc = self.dal.get_by_id(_id)
         self.logger.debug('read doc')
-        self.assertEqual(id, doc['_id'])
-        self.assertEqual(doc['test'], testDoc['test'])
+        self.assertEqual(_id, doc['_id'])
+        self.assertEqual(doc['test'], test_doc['test'])
         self.assertEqual({*doc}, {'_id', 'test'})
         self.logger.debug('----------testGetById----------\n')
 
     def testIncCounter(self):
         self.logger.debug('----------testIncCounter----------')
-        testDoc = {'counter': 0}
-        id = self.dal.insert_doc(testDoc)
-        self.dal.inc_counter(id)
-        self.dal.inc_counter(id)
-        doc = self.dal.get_by_id(id)
+        test_doc = {'counter': 0}
+        _id = self.dal.insert_doc(test_doc)
+        self.dal.inc_counter(_id)
+        self.dal.inc_counter(_id)
+        doc = self.dal.get_by_id(_id)
         self.assertEqual(2, doc['counter'])
         self.logger.debug('----------testIncCounter----------\n')
 
     def testRaisesDuplicateIdError(self):
         self.logger.debug('----------testRaisesDuplicateIdError----------')
-        testDoc = {'test': True}
-        id = self.dal.insert_doc(testDoc)
-        testDoc2 = {'_id': id, 'test': True}
-        self.assertRaises(DbDuplicateIdError, self.dal.insert_doc, testDoc2)
+        test_doc = {'test': True}
+        id = self.dal.insert_doc(test_doc)
+        test_doc2 = {'_id': id, 'test': True}
+        self.assertRaises(DbDuplicateIdError, self.dal.insert_doc, test_doc2)
 
     def testNewTestCase(self):
         self.skipTest('not implemented yet')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -6,11 +6,12 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import logging.config
 
+''' example functions for accessing mongodb
+    all operations are idempotent so they can be safely retried in the face of network errors
+'''
+
 
 class MongoDal:
-    ''' example functions for accessing mongodb
-        all operations are idempotent so they can be safely retried in the face of network errors
-    '''
 
     def __init__(self, connString, logLevel):
 
@@ -51,8 +52,8 @@ class MongoDal:
             # concern option until a write is attempted.
             try:
                 self.logger.debug('testing connection to mongodb')
-                #calling server_info() will catch a bad connection string before
-                #waiting for the first read operation to be calleed
+                # calling server_info() will catch a bad connection string before
+                # waiting for the first read operation to be called
                 client.server_info()
                 # create all collections
                 # write concern here is redundant since it is also set on the
@@ -148,12 +149,13 @@ class MongoDal:
         # create a unique id to represent this particular increment operation
         opid = ObjectId()
         try:
-            newCount = self.__retry_on_error(
+            new_count = self.__retry_on_error(
                 self.dalExample.find_one_and_update,
                 # query by id and that this operation hasn't been completed
                 # already
                 {'_id': id, 'opids': {'$ne': opid}},
-                # increment the counter and add the opid for this operation into the opids array to note that it has been completed
+                # increment the counter and add the opid for this operation into the opids array to note that
+                # it has been completed.
                 # slice the oldest elements out of the array if it is too large. should be no smaller than
                 # the expected number of concurrent updates on this document
                 {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
@@ -162,12 +164,12 @@ class MongoDal:
                 projection={'counter': True, '_id': False},
                 return_document=ReturnDocument.AFTER
             )
-            # newCount might be None if the operation was successful on the first try
+            # new_count might be None if the operation was successful on the first try
             # but resulted in a network error. The retry will not match the document and will not return the new count
             # query the document to get an accurate count
             self.logger.debug(
                 'completed incCounter. Current count is {count!s}'.format(
-                    count=newCount['counter']))
+                    count=new_count['counter']))
         except PyMongoError as e:
             self.logger.error(
                 'failed to increment the counter: {!s}'.format(e))
@@ -192,11 +194,11 @@ class MongoDal:
             raise
 
     '''This function exists to compensate for when network errors and primary
-       failovers happen during our operation. A network error can occur on
+       fail overs happen during our operation. A network error can occur on
        the way to the database so that our operation never arrived, or on the
        way back so that we do not know the operation took place. Making all
        operations safe to retry and retrying them exactly once in the face of
-       these network errors prevents raising unecessary errors to the user.
+       these network errors prevents raising unnecessary errors to the user.
 
        In v3.6 of the driver this functionality is built in for operations on
        single documents with retryable writes.
@@ -220,40 +222,46 @@ class MongoDal:
             self.logger.error('error is not retryable: {!s}'.format(e))
             raise
 
-# Custom mongo_dal errors so higher functions don't need to catch
-# pymongo-specific errors
+
+'''Base class for custom exceptions
+   this prevents higher functions from needing to catch pymongo-specific errors
+'''
 
 
 class DatabaseError(Exception):
-    '''Base class for exceptions'''
     pass
+
 
 class DbConnectionRefusedError(DatabaseError):
     def __init__(self):
         self.message = 'connection refused to '.format(self.connString)
 
 
-class DbDuplicateIdError(DatabaseError):
-    '''Exception raised when attempting to insert a document which contains
-       an _id which is already present in the collection
+'''Exception raised when attempting to insert a document which contains
+   an _id which is already present in the collection
 
-    Attributes:
-        id -- the id which caused the error
-        message -- generated explanation of the error
-    '''
+Attributes:
+    id -- the id which caused the error
+    message -- generated explanation of the error
+'''
+
+
+class DbDuplicateIdError(DatabaseError):
 
     def __init__(self, id):
         self.id = id
         self.message = 'id {!s} already present in collection'.format(self.id)
 
 
-class DbWrappedError(DatabaseError):
-    '''Exception wraps any unexpected pymongo errors before raising
+'''Exception wraps any unexpected pymongo errors before raising
 
-    Attributes:
-        err -- the original error being wrapped
-        message -- generated explanation of the error
-    '''
+Attributes:
+    err -- the original error being wrapped
+    message -- generated explanation of the error
+'''
+
+
+class DbWrappedError(DatabaseError):
 
     def __init__(self, err):
         self.message = 'pymongo error raised: {!s}'.format(err)
