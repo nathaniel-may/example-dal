@@ -1,5 +1,5 @@
 from mongo_dal import MongoDal
-from mongo_dal import DbDuplicateIdError
+from mongo_dal import DbDuplicateIdError, DbNotConnectedError
 from bson.objectid import ObjectId
 from datetime import datetime
 import unittest
@@ -34,6 +34,14 @@ class MongoDalTest(unittest.TestCase):
         self.logger.debug('----------tearDown----------')
         self.dal.delete_all_docs()
         self.logger.debug('----------tearDown----------\n')
+
+    def testRaisesDbNotConnectedError(self):
+        self.logger.debug('----------testRaisesDbNotConnectedError----------')
+        dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
+                           logging.DEBUG)
+        self.dal.get_by_id('dummy_id')
+        self.assertRaises(DbNotConnectedError)
+        self.logger.debug('----------testRaisesDbNotConnectedError----------')
 
     def testInsertingOneDoc(self):
         self.logger.debug('----------testInsertingOneDoc----------')

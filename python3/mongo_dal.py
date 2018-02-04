@@ -28,76 +28,82 @@ class MongoDal:
 
         # set variables for connecting to mongo
         self.connString = connString
+        # setting flag for connection assert in later functions
+        # self.connect must be called after init for error handling
+        self.__connected = False
+
+        # creating the MongoClient and and collection definitions here
+        # because they don't reach out to the database until called
+        # and there should only ever be one instance of MongoClient
+        # Connect must be called after creating this to error handle
+        # initial connection issues
+        self.client = MongoClient(self.connString, w='majority')
+
+        # write concern is redundant here because it is  set on the 
+        # client connection above. colleciton defined write concern
+        # overrides client definitions. 
+        write_concern = WriteConcern(w='majority', wtimeout=10000, j=True)
+        self.dalExample = self.client.pydal.get_collection(
+            'example',
+            write_concern=write_concern)
+        self.dalExampleReadMaj = self.client.pydal.get_collection(
+            'example',
+            write_concern=write_concern,
+            read_concern=ReadConcern(level='majority'))
+
+
         self.logger.debug('completed __init__')
 
     def connect(self):
         # connect to mongodb
-        self.logger.debug('started init()')
-        if hasattr(self, 'client'):
-            self.logger.debug('client is already connected')
-        else:
-            self.logger.info('setting up the connection')
-            '''here write concern is set on the whole client 
-               this can also be set on the following levels:
-               - connection string
-               - client connection
-               - database
-               - collection
-               - operation
-            '''
-            client = MongoClient(self.connString,
-                                 w='majority')
-            db = client.pydal
-            # test connection and error handle results. won't catch bad write
-            # concern option until a write is attempted.
-            try:
-                self.logger.debug('testing connection to mongodb')
-                # calling server_info() will catch a bad connection string before
-                # waiting for the first read operation to be called
-                client.server_info()
-                # create all collections
-                # write concern here is redundant since it is also set on the
-                # client
-                self.dalExample = db.get_collection(
-                    'example', write_concern=WriteConcern(
-                        w='majority', wtimeout=10000, j=True))
-                self.dalExampleReadMaj = db.get_collection(
-                    'example', write_concern=WriteConcern(
-                        w='majority', wtimeout=10000, j=True), read_concern=ReadConcern(
-                        level='majority'))
-                # client is connected. assign to complete singleton
-                self.client = client
-                self.logger.debug('completed init()')
-            except ConnectionFailure as e:
-                self.logger.fatal(
-                    'Connection refused to {!s}.'.format(
-                        self.connString))
-                raise DbConnectionRefusedError(e)
-            except ServerSelectionTimeoutError as e:
-                self.logger.fatal(
-                    'Server selection timeout. Are these servers reachable? {!s}'.format(
-                        self.connString))
-                raise DatabaseConnectionError(e)
-            except PyMongoError as e:
-                self.logger.fatal('error connecting: {!s}'.format(e))
-                raise DbWrappedError(e)
-            except Exception as e:
-                self.logger.fatal('error connecting: {!s}'.format(e))
-                raise
+        self.logger.debug('started connect')
+        # test connection and error handle results. won't catch bad write
+        # concern option until a write is attempted.
+        try:
+            self.logger.debug('testing connection to mongodb')
+
+            # calling server_info() will catch a bad connection string and
+            # an unavailable unavilable cluster
+            self.client.server_info()
+            
+            # setting flag for connection assert in later functions
+            self.__connected = True
+            self.logger.debug('completed connect')
+        except ConnectionFailure as e:
+            self.logger.fatal(
+                'Connection refused to {!s}.'.format(
+                    self.connString))
+            raise DbConnectionRefusedError(e)
+        except ServerSelectionTimeoutError as e:
+            self.logger.fatal(
+                'Server selection timeout. Are these servers reachable? {!s}'.format(
+                    self.connString))
+            raise DatabaseConnectionError(e)
+        except PyMongoError as e:
+            self.logger.fatal('error connecting: {!s}'.format(e))
+            raise DbWrappedError(e)
+        except Exception as e:
+            self.logger.fatal('error connecting: {!s}'.format(e))
+            raise
+
+    def __assert_connected(self):
+        if not self.__connected:
+            raise DbNotConnectedError()
 
     def close(self):
-        if not hasattr(self, 'client'):
-            try:
-                self.client.close()
-                self.logger.debug('client closed')
-            except PyMongoError as e:
-                self.logger.error('error closing client: {!s}'.format(e))
-                raise DbWrappedError(e)
-            except Exception:
-                self.logger.error('error closing client: {!s}'.format(e))
-                raise
+        self.__assert_connected()
+        try:
+            self.client.close()
+            self.logger.debug('client closed')
+        except PyMongoError as e:
+            self.logger.error('error closing client: {!s}'.format(e))
+            raise DbWrappedError(e)
+        except Exception:
+            self.logger.error('error closing client: {!s}'.format(e))
+            raise
 
     def insert_doc(self, doc):
+        self.__assert_connected()
         self.logger.debug('started insert_doc')
         # assign an _id app-side so the operation can be safely retried
         if '_id' not in doc:
@@ -127,6 +133,7 @@ class MongoDal:
             raise
 
     def get_by_id(self, id):
+        self.__assert_connected()
         self.logger.debug('started get_by_id')
         try:
             doc = self.__retry_on_error(
@@ -145,6 +152,7 @@ class MongoDal:
     # this uses the algorithm outlined here to achieve idempotency:
     # https://explore.mongodb.com/developer/nathaniel-may
     def inc_counter(self, id):
+        self.__assert_connected()
         self.logger.debug('started incCounter')
         # create a unique id to represent this particular increment operation
         opid = ObjectId()
@@ -180,6 +188,7 @@ class MongoDal:
             raise
 
     def delete_all_docs(self):
+        self.__assert_connected()
         self.logger.debug('started delete_all_docs')
         try:
             self.__retry_on_error(
@@ -206,7 +215,7 @@ class MongoDal:
     def __retry_on_error(self, fn, *args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except AutoReconnect as netErr:  # NetworkError base class
+        except ConnectionFailure as netErr:  # NetworkError base class
             self.logger.debug('experienced network error- retrying')
             try:
                 return fn(*args, **kwargs)
@@ -230,6 +239,17 @@ class MongoDal:
 
 class DatabaseError(Exception):
     pass
+
+'''Exception raised when a database action has been called but 
+   self.connect has not been called which has important error handling
+'''
+
+
+class DbNotConnectedError(DatabaseError):
+    def __init__(self):
+        self.message = 'must call connect after init'
+
+'''Exception raise when connection is refused to mongodb'''
 
 
 class DbConnectionRefusedError(DatabaseError):
