@@ -13,10 +13,10 @@ import logging.config
 
 class MongoDal:
 
-    def __init__(self, connString, logLevel):
+    def __init__(self, connString, logLevel, logger_name='DAL'):
 
         # logging
-        self.logger = logging.getLogger('DAL')
+        self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(logLevel)
         handler = logging.StreamHandler()
         handler.setLevel(logLevel)

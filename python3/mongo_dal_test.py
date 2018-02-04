@@ -1,5 +1,5 @@
 from mongo_dal import MongoDal
-from mongo_dal import DbDuplicateIdError, DbNotConnectedError
+from mongo_dal import DbDuplicateIdError, DbNotConnectedError, DbAlreadyConnectedError
 from bson.objectid import ObjectId
 from datetime import datetime
 import unittest
@@ -37,11 +37,18 @@ class MongoDalTest(unittest.TestCase):
 
     def testRaisesDbNotConnectedError(self):
         self.logger.debug('----------testRaisesDbNotConnectedError----------')
-        dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
-                           logging.DEBUG)
-        self.dal.get_by_id('dummy_id')
-        self.assertRaises(DbNotConnectedError)
-        self.logger.debug('----------testRaisesDbNotConnectedError----------')
+        local_dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
+                             logging.DEBUG, logger_name='local_dal')
+        with self.assertRaises(DbNotConnectedError):
+            local_dal.get_by_id('dummy_id')
+        
+        self.logger.debug('----------testRaisesDbNotConnectedError----------\n')
+
+    def testRaisesDbAlreadyConnectedError(self):
+        self.logger.debug('----------testRaisesDbAlreadyConnectedError----------')
+        with self.assertRaises(DbAlreadyConnectedError):
+            self.dal.connect()
+        self.logger.debug('----------testRaisesDbAlreadyConnectedError----------\n')
 
     def testInsertingOneDoc(self):
         self.logger.debug('----------testInsertingOneDoc----------')
@@ -97,7 +104,8 @@ class MongoDalTest(unittest.TestCase):
         test_doc = {'test': True}
         id = self.dal.insert_doc(test_doc)
         test_doc2 = {'_id': id, 'test': True}
-        self.assertRaises(DbDuplicateIdError, self.dal.insert_doc, test_doc2)
+        with self.assertRaises(DbDuplicateIdError):
+            self.dal.insert_doc(test_doc2)
 
     def testNewTestCase(self):
         self.skipTest('not implemented yet')
