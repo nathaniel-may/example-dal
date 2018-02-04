@@ -6,8 +6,8 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import logging.config
 
-''' example functions for accessing mongodb
-    all operations are idempotent so they can be safely retried in the face of network errors
+''' Example functions for accessing mongodb.
+    All operations can be safely retried in the face of network errors.
 '''
 
 
@@ -51,12 +51,25 @@ class MongoDal:
             write_concern=write_concern,
             read_concern=ReadConcern(level='majority'))
 
-
         self.logger.debug('completed __init__')
 
     def connect(self):
+        """
+        Connects to the database. Raises errors caused by reads with an
+        incorrectly configured connection string. Errors relating to write options
+        such as write concern are only raised when a write is attempted
+
+        Must be called once before calling any other function
+
+        Calling twice raises an error
+        """
         # connect to mongodb
         self.logger.debug('started connect')
+
+        # if this has already been called raise an error
+        if self.__connected:
+            raise DbAlreadyConnectedError()
+
         # test connection and error handle results. won't catch bad write
         # concern option until a write is attempted.
         try:
@@ -87,13 +100,21 @@ class MongoDal:
             raise
 
     def __assert_connected(self):
+        """Raises DbNotConnectedError if connect has not been called"""
+
         if not self.__connected:
             raise DbNotConnectedError()
 
     def close(self):
+        """Closes the connection to MongoDB.
+
+        Connection can be reinitialized by calling self.connect.
+        """
+
         self.__assert_connected()
         try:
             self.client.close()
+            self.__connected = False
             self.logger.debug('client closed')
         except PyMongoError as e:
             self.logger.error('error closing client: {!s}'.format(e))
@@ -103,6 +124,10 @@ class MongoDal:
             raise
 
     def insert_doc(self, doc):
+        """function for inserting a document.
+
+        Assigns an id to the document if it does not already exist to make it safe to retry"""
+
         self.__assert_connected()
         self.logger.debug('started insert_doc')
         # assign an _id app-side so the operation can be safely retried
@@ -133,6 +158,8 @@ class MongoDal:
             raise
 
     def get_by_id(self, id):
+        """Gets a document by id"""
+
         self.__assert_connected()
         self.logger.debug('started get_by_id')
         try:
@@ -152,6 +179,11 @@ class MongoDal:
     # this uses the algorithm outlined here to achieve idempotency:
     # https://explore.mongodb.com/developer/nathaniel-may
     def inc_counter(self, id):
+        """Increments the counter field of the document.
+
+        Appends ObjectIds to the document in the opids array to achieve idempotency.
+        """
+
         self.__assert_connected()
         self.logger.debug('started incCounter')
         # create a unique id to represent this particular increment operation
@@ -188,6 +220,8 @@ class MongoDal:
             raise
 
     def delete_all_docs(self):
+        """Deletes all documents in the collection. Does not drop the collection"""
+
         self.__assert_connected()
         self.logger.debug('started delete_all_docs')
         try:
@@ -202,17 +236,18 @@ class MongoDal:
             self.logger.error('error deleting_all_docs: {!s}'.format(e))
             raise
 
-    '''This function exists to compensate for when network errors and primary
-       fail overs happen during our operation. A network error can occur on
-       the way to the database so that our operation never arrived, or on the
-       way back so that we do not know the operation took place. Making all
-       operations safe to retry and retrying them exactly once in the face of
-       these network errors prevents raising unnecessary errors to the user.
-
-       In v3.6 of the driver this functionality is built in for operations on
-       single documents with retryable writes.
-    '''
     def __retry_on_error(self, fn, *args, **kwargs):
+        """This function exists to compensate for when network errors and primary
+           fail overs happen during our operation. A network error can occur on
+           the way to the database so that our operation never arrived, or on the
+           way back so that we do not know the operation took place. Making all
+           operations safe to retry and retrying them exactly once in the face of
+           these network errors prevents raising unnecessary errors to the user.
+
+           In v3.6 of the driver this functionality is built in for operations on
+           single documents with retryable writes.
+        """
+
         try:
             return fn(*args, **kwargs)
         except ConnectionFailure as netErr:  # NetworkError base class
@@ -232,56 +267,68 @@ class MongoDal:
             raise
 
 
-'''Base class for custom exceptions
-   this prevents higher functions from needing to catch pymongo-specific errors
-'''
-
-
 class DatabaseError(Exception):
-    pass
+    """Base class for custom exceptions
+       this prevents higher functions from needing to catch pymongo-specific errors
+    """
 
-'''Exception raised when a database action has been called but 
-   self.connect has not been called which has important error handling
-'''
+    pass
 
 
 class DbNotConnectedError(DatabaseError):
+    """Exception raised when a database action has been called but
+       self.connect has not been called which has important error handling
+
+    Attributes:
+        message -- generated explanation of the error
+    """
+
     def __init__(self):
         self.message = 'must call connect after init'
 
-'''Exception raise when connection is refused to mongodb'''
+class DbAlreadyConnectedError(DatabaseError):
+    """Exception raised when self.connect has been called twice
+
+    Attributes:
+        message -- generated explanation of the error
+    """
+
+    def __init__(self):
+        self.message = 'must call connect only once'
 
 
 class DbConnectionRefusedError(DatabaseError):
+    """Exception raise when connection is refused to mongodb
+
+    Attributes:
+        message -- generated explanation of the error
+    """
+
     def __init__(self):
         self.message = 'connection refused to '.format(self.connString)
 
 
-'''Exception raised when attempting to insert a document which contains
-   an _id which is already present in the collection
-
-Attributes:
-    id -- the id which caused the error
-    message -- generated explanation of the error
-'''
-
-
 class DbDuplicateIdError(DatabaseError):
+    """Exception raised when attempting to insert a document which contains
+       an _id which is already present in the collection
+
+    Attributes:
+        id -- the id which caused the error
+        message -- generated explanation of the error
+    """
 
     def __init__(self, id):
         self.id = id
         self.message = 'id {!s} already present in collection'.format(self.id)
 
 
-'''Exception wraps any unexpected pymongo errors before raising
-
-Attributes:
-    err -- the original error being wrapped
-    message -- generated explanation of the error
-'''
-
-
 class DbWrappedError(DatabaseError):
+    """Exception wraps any unexpected pymongo errors before raising
+
+    Attributes:
+        err -- the original error being wrapped
+        message -- generated explanation of the error
+    """
 
     def __init__(self, err):
         self.message = 'pymongo error raised: {!s}'.format(err)
