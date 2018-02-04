@@ -116,7 +116,7 @@ python3 ./mongo_dal_test.py
 
 ## Authors
 
-* **Nathaniel May** - [Maybe I'll put up my website one day](http://nathanielmay.com)
+* [Nathaniel May](http://nathanielmay.com)
 
 ## License
 
