@@ -25,7 +25,7 @@ class MongoDal{
     const levels = ['silly', 'debug', 'info', 'warn', 'error'];
     for(let level = 0; level<levels.length; level++){
       const fn = this.logger[levels[level]];
-      this.logger[levels[level]] = (str) => fn(`${new Date()} ${this.logModule} ${str}`);
+      this.logger[levels[level]] = str => fn(`${new Date()} ${this.logModule} ${str}`);
     }
 
 
@@ -213,7 +213,8 @@ class MongoDal{
     };
   }
 
-  //arguments: first parameter is the function to call which returns a promise. All following arguments are passed to the function when called.
+  //arguments: first parameter is the function to call which returns a promise. 
+  //All following arguments are passed to the function when called.
   async _retryOnErr(...args){
     this.logger.silly(`_retryOnErr called`);
     //remove the first arg and store it as fn
