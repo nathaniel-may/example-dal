@@ -70,7 +70,7 @@ class MongoDal{
     });
   }
 
-  insertDoc(doc){
+  async insertDoc(doc){
     this.logger.debug(`insertDoc function called with doc ${JSON.stringify(doc)}`);
 
     //assigning an id allows for safe retries of inserts
@@ -86,17 +86,18 @@ class MongoDal{
     const fn = (doc, writeConcern) => this.dalData.insertOne(doc, writeConcern);
 
     //call the function with retry logic
-    return this._retryOnErr(fn, doc, {w:'majority'}).then((res) => {
+    try{
+      await this._retryOnErr(fn, doc, {w:'majority'});
       this.logger.debug(`document successfully inserted`);
       return doc._id;
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`error inserting doc: ${err}`);
       throw err;
-    })
+    }
   };
 
-  getById(id){
+  async getById(id){
     this.logger.silly(`getById function called with id ${id}`);
 
     //define the funciton to query a document by id and return all fields except the array of opids.
@@ -110,17 +111,18 @@ class MongoDal{
                          .next();
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((doc) => {
+    try{
+      const doc = await this._retryOnErr(fn);
       this.logger.debug(`found doc with id ${id}`);
       return doc;
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`error getting by id`);
       throw err;
-    });
+    };
   };
 
-  countCol(){
+  async countCol(){
     this.logger.silly(`countCol function called`);
 
     //define the function return the collection count. the query comment helps with debugging
@@ -128,18 +130,19 @@ class MongoDal{
     const fn = () => this.dalData.find({}).comment('countCol from MongoDal.js').count();
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((count) => {
+    try{
+      const count = await this._retryOnErr(fn);
       this.logger.debug(`collection count is ${count}`);
       return count;
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`error counting collection: ${err}`);
       throw err;
-    });
+    };
   }
 
   //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
-  incCounter(id){
+  async incCounter(id){
     this.logger.silly(`incCounter called for doc ${id}`);
 
     //create a unique id to represent this particular increment operation
@@ -149,29 +152,30 @@ class MongoDal{
     //since all documents are queried by id -and- the opid not existing in the array
     //this function is safe to retry. slice removes the oldest elements in the array beyond
     //the specified size to prevent infinite growth of the opids array.
-    const fn = () => this.dalData.findOneAndUpdate(
-                                 //query by id and that this operation hasn't been completed already
-                                 {'_id': id, 'opids': {'$ne': opid}},
-                                 //increment the counter and add the opid for this operation into the opids array
-                                 //slice the oldest elements out of the array if it is too large
-                                 {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
-                                 //don't bring back the whole document which includes the list of opids
-                                 //only return the new counter value for logging purposes
-                                 {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
-    .then((updatedDoc) => {
+    const fn = async () => {
+      //not surrounded in a try catch because we want it to throw errors higher
+      const updatedDoc = await this.dalData.findOneAndUpdate(
+        //query by id and that this operation hasn't been completed already
+        {'_id': id, 'opids': {'$ne': opid}},
+        //increment the counter and add the opid for this operation into the opids array
+        //slice the oldest elements out of the array if it is too large
+        {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
+        //don't bring back the whole document which includes the list of opids
+        //only return the new counter value for logging purposes
+        {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'}
+      )
+
       this.logger.silly(`incCounter updated doc`);
       //value will be null when it matches no documents. this will happen when a network error 
       //occurred on the way back from the db before the retry, and the retry doesn't match any documents
       if(null != updatedDoc.value){
         return updatedDoc.value.counter;
       }
-    })
-    .catch((err) => {
-      throw err;
-    });
+    }
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((count) => {
+    try{
+      const count = await this._retryOnErr(fn);
       if(undefined != count){
         this.logger.debug(`counter incremented to ${count}`);
       }
@@ -182,14 +186,14 @@ class MongoDal{
       //the ok response, the query will match -no documents- since the operation succeeded and the 
       //opid will be present in the opids array. the response of the query will be undefined
       //in this instance. to get an accurate value, query the doc byId afterward.
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`error incrementing counter: ${err}`);
       throw err;
-    });
+    };
   }
 
-  deleteAllDocs(){
+  async deleteAllDocs(){
     this.logger.silly(`deleteAllDocs called`);
 
     //define the function to delete all documents with write concern majority
@@ -197,41 +201,46 @@ class MongoDal{
     const fn = () => this.dalData.deleteMany({}, {w:'majority'});
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then(() => this.logger.debug(`deleted all docs`))
-    .catch((err) => {
+    try{
+      await this._retryOnErr(fn);
+      this.logger.debug(`deleted all docs`);
+    }
+    catch(err){
       this.logger.error(`error getting by id`);
       throw err;
-    });
+    };
   }
 
   //arguments: first parameter is the function to call which returns a promise. All following arguments are passed to the function when called.
-  _retryOnErr(...args){
+  async _retryOnErr(...args){
     this.logger.silly(`_retryOnErr called`);
     //remove the first arg and store it as fn
     //args now only contains the args to pass to fn
     const fn = args.shift()
     //call the function for the first time
-    return fn.apply(this, args).then((res) => {
+    try{
+      const res = await fn.apply(this, args);
       this.logger.silly(`success on first attempt`);
       //if nothing went wrong, return the response
       return res;
-    })
+    }
     //the function returned an error on the first call
-    .catch((err) => {
+    catch(err){
       //if the error is a network error or an interrupt error it may be able to be resolved by retrying
       if(MongoDal.networkErrors[err.code] != undefined || MongoDal.interruptErrors[err.code] != undefined){
         this.logger.warn(`experienced network error- retrying`);
         //call the function for the second time. The MongoDB driver automatically waits for a 
         //visible primary for no more than 30 seconds.
-        return fn.apply(this, args).then((res) => {
+        try{
+          const res = await fn.apply(this, args)
           this.logger.debug(`retry resolved network error`);
           return res;
-        })
-        .catch((err) => {
+        }
+        catch(err){
           //the only way for a duplicate key error to happen here is if it occured
           //after a retry, and not on the initial call. this means the initial call inserted
           //the document but the response was interrupted, so this error can be ignored
-          if(err.code == MongoDal.errors['duplicate key exception']){
+          if(err.code == MongoDal.mongoErrors['duplicate key exception']){
             this.logger.debug(`retry resolved network error`);
             return;
           }
@@ -241,14 +250,14 @@ class MongoDal{
             this.logger.error(`could not resolve with retry: ${err}`);
             throw new Error('Database Unavailable');
           }
-        })
+        };
       }
       //the error is not a network error or an interrupt error and is therefore not retryable
       else{
         this.logger.error(`experienced error that is not retryable: ${err}`);
         throw err;
       }
-    });
+    };
   }
 
 }
@@ -276,7 +285,7 @@ MongoDal.interruptErrors = {
   'exceeded time limit':50
 };
 
-MongoDal.errors = {
+MongoDal.mongoErrors = {
   11000:'duplicate key exception',
   'duplicate key exception':11000
 };
