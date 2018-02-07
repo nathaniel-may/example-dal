@@ -2,7 +2,8 @@
 var winston = require('winston');
 var ObjectId = require('mongodb').ObjectId;
 var MongoError = require('mongodb').MongoError;
-var MongoDal = require('../MongoDal');
+var MongoDal = require('../MongoDal').MongoDal;
+var MongoDalErrors = require('../MongoDal').Errors;
 
 //define variables
 var dal;
@@ -110,28 +111,36 @@ describe('MongoDal', () => {
       subDoc: {string1: 'str1', str2: 'str2'}
     };
 
-  beforeAll( async done => {
-    this.logger.debug(`---beforeAll started---`);
-
+  recreateMongoDal = () => {
     //create MongoDal
     try{
-      dal = new MongoDal(connString, 'silly');
+      this.dal = new MongoDal(connString, 'silly');
     }
     catch(err){
       this.logger.error(`error creating MongoDal instance: ${err}`);
       fail(err);
       done(); return;
     }
+  }
 
-    //setup the this.logger
+  initMongoDal = async () => {
     try{
-      await dal.init();
+      await this.dal.init();
       this.logger.debug(`dal init completed`);
     }
     catch(err) {
       this.logger.error(`error attempting to init MongoDal: ${err}`);
       fail();
     }
+  }
+
+
+  beforeAll( async done => {
+    this.logger.debug(`---beforeAll started---`);
+
+    //create MongoDal
+    recreateMongoDal();
+    await initMongoDal();
 
     this.logger.debug(`---beforeAll completed---
                       `);
@@ -141,7 +150,7 @@ describe('MongoDal', () => {
   it('inserts one doc', async done => {
     this.logger.debug(`---inserts one doc---`);
     try{
-      const id = await dal.insertDoc(testDoc);
+      const id = await this.dal.insertDoc(testDoc);
       this.logger.debug(`got id: ${id}`);
       expect(id instanceof ObjectId).toBe(true);
     }
@@ -159,10 +168,10 @@ describe('MongoDal', () => {
     this.logger.debug(`---gets document by id---`);
     let _id;
     try{
-      const id = await dal.insertDoc(testDoc);
+      const id = await this.dal.insertDoc(testDoc);
       this.logger.debug(`inserted doc.`);
       _id = id;
-      const doc = await dal.getById(id);
+      const doc = await this.dal.getById(id);
       expect(doc._id).toEqual(_id);
       expect(doc.num).toEqual(99);
     }
@@ -179,13 +188,13 @@ describe('MongoDal', () => {
   it('counts the collection', async done => {
     this.logger.debug(`---counts the collection---`);
     try{
-      const count1 = await dal.countCol();
+      const count1 = await this.dal.countCol();
       expect(count1).toBe(0);
-      await Promise.all([dal.insertDoc({test:0}),
-                         dal.insertDoc({test:1}),
-                         dal.insertDoc({test:2})]);
+      await Promise.all([this.dal.insertDoc({test:0}),
+                         this.dal.insertDoc({test:1}),
+                         this.dal.insertDoc({test:2})]);
       this.logger.debug(`inserted all 3 docs`);
-      const count2 = await dal.countCol();
+      const count2 = await this.dal.countCol();
       this.logger.debug(`counted ${count2} docs`);
       expect(count2).toBe(3);
     }
@@ -203,18 +212,18 @@ describe('MongoDal', () => {
     this.logger.debug(`---deletes all docs---`);
     try{
       //insert and expect 3 documents
-      await Promise.all([dal.insertDoc({test:0}),
-                   dal.insertDoc({test:1}),
-                   dal.insertDoc({test:2})]);
+      await Promise.all([this.dal.insertDoc({test:0}),
+                   this.dal.insertDoc({test:1}),
+                   this.dal.insertDoc({test:2})]);
       this.logger.debug(`inserted all 3 docs`);
-      const count1 = await dal.countCol();
+      const count1 = await this.dal.countCol();
       this.logger.debug(`counted ${count1} docs`);
       expect(count1).toBe(3);
 
       //delete all docs and expect 0
-      await dal.deleteAllDocs();
+      await this.dal.deleteAllDocs();
       this.logger.debug(`all docs successfully deleted`);
-      const count2 = await dal.countCol();
+      const count2 = await this.dal.countCol();
       this.logger.debug(`counted ${count2} docs after delete`);
       expect(count2).toBe(0);
     }
@@ -236,7 +245,7 @@ describe('MongoDal', () => {
     spyOn(callTracker, 'netErr').and.callThrough();
 
     try{
-      const res = await dal._retryOnErr(() => callTracker.netErr());
+      const res = await this.dal._retryOnErr(() => callTracker.netErr());
       expect(callTracker.netErr).toHaveBeenCalledTimes(2);
       expect(res).toBe('resolved');
     }
@@ -258,7 +267,7 @@ describe('MongoDal', () => {
     this.logger.debug(`created call tracker`);
 
     try{
-      await dal._retryOnErr(callTracker.dupKeyErr);
+      await this.dal._retryOnErr(callTracker.dupKeyErr);
     }
     catch(err){
       this.logger.debug(`caught error ${err}`);
@@ -279,7 +288,7 @@ describe('MongoDal', () => {
     this.logger.debug(`created call tracker`);
 
     try{
-      await dal._retryOnErr(() => callTracker.netErrThenDupKey());
+      await this.dal._retryOnErr(() => callTracker.netErrThenDupKey());
       this.logger.debug(`no error`);
       expect(callTracker.netErrThenDupKey).toHaveBeenCalledTimes(2);
     }
@@ -299,12 +308,12 @@ describe('MongoDal', () => {
     doc.counter = 0;
 
     try{
-      let id = await dal.insertDoc(doc);
+      let id = await this.dal.insertDoc(doc);
       this.logger.debug(`inserted doc with counter`);
       doc._id = id;
-      await dal.incCounter(id);
+      await this.dal.incCounter(id);
       this.logger.debug(`incCounter success`);
-      const updatedDoc = await dal.getById(doc._id);
+      const updatedDoc = await this.dal.getById(doc._id);
       this.logger.debug(`fetched doc by id`);
       expect(updatedDoc.counter).toBe(1);
     }
@@ -379,24 +388,24 @@ describe('MongoDal', () => {
       }
     }
 
-    let realCol = dal._database.collection('data');;
+    let realCol = this.dal._database.collection('data');;
     let fakeCol = new FakeCol(realCol);
 
     try{
-      const id = await dal.insertDoc(counterDoc);
+      const id = await this.dal.insertDoc(counterDoc);
       this.logger.debug(`inserted doc with counter`);
       counterDoc._id = id;
       
       //replace the collection definition with a mockup
-      dal.dalData = fakeCol;
+      this.dal.dalData = fakeCol;
 
-      await dal.incCounter(id);
+      await this.dal.incCounter(id);
       expect(fakeCol.called).toBe(2);
       this.logger.debug(`this test wrecked the dal instance. Making a new one`);
       dal = new MongoDal(connString, 'silly');
-      await dal.init();
+      await this.dal.init();
       this.logger.silly(`new instance created. Finding document to compare count`);
-      const doc = await dal.getById(counterDoc._id);
+      const doc = await this.dal.getById(counterDoc._id);
       expect(doc.counter).toBe(1)
     }
     catch(err){
@@ -409,17 +418,35 @@ describe('MongoDal', () => {
     done();
   });
 
+  it('throws DbNotConnectedError when not not connected', async done => {
+    this.logger.debug(`---throws DbNotConnectedError when not not connected---`);
+    try{
+      recreateMongoDal();
+      const id = await this.dal.insertDoc(testDoc);
+      fail('expected DbNotConnectedError');
+    }
+    catch(err){
+      expect(err instanceof MongoDalErrors.DbNotConnectedError)
+    }
+
+    //init for cleanup
+    await initMongoDal();
+
+    this.logger.debug(`---throws DbNotConnectedError when not not connected---
+                      `);
+    done();
+  });
+
   afterEach( async done => {
     this.logger.silly(`---after each---`);
 
     try{
-      const count = await dal.deleteAllDocs();
+      const count = await this.dal.deleteAllDocs();
       this.logger.silly(`deleted ${count} existing docs.`);
     }
     catch(err){
       this.logger.error(`error deleting all docs in afterEach: ${err}`);
       fail(err);
-      done();
     }
 
     this.logger.silly(`---after each---

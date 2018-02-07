@@ -12,6 +12,7 @@ class MongoDal{
     this.logModule = 'DAL';
     this.connString = connString;
     this._database = null;
+    this._connected = false;
 
     // std out logging
     this.logger = new (Winston.Logger)({
@@ -65,7 +66,9 @@ class MongoDal{
       const db = await MongoClient.connect(this.connString);
       this.logger.debug(`MongoClient success`);
       //return the requested database. the database does not need to exist for this to work.
-      return db.db(dbName);
+      const newDb = db.db(dbName);
+      this._connected = true;
+      return newDb;
     }
     catch(err){
       this.logger.error(`_connect failed`);
@@ -74,6 +77,8 @@ class MongoDal{
   }
 
   async insertDoc(doc){
+    this._assertConnected();
+
     this.logger.debug(`insertDoc function called with doc ${JSON.stringify(doc)}`);
 
     //assigning an id allows for safe retries of inserts
@@ -263,6 +268,12 @@ class MongoDal{
     };
   }
 
+  _assertConnected(){
+    if(!this._connected){
+      throw new DbNotConnectedError();
+    }
+  }
+
 }
 
 //define static class vars
@@ -293,4 +304,27 @@ MongoDal.mongoErrors = {
   'duplicate key exception':11000
 };
 
-module.exports = MongoDal;
+//parent error for all MongoDal errors
+class DbError extends Error{
+  constructor(...args) {
+    super(...args);
+    Error.captureStackTrace(this, DbError);
+  }
+}
+
+class DbNotConnectedError extends DbError{
+  constructor() {
+    super('function called before database was connected');
+    Error.captureStackTrace(this, DbNotConnectedError);
+  }
+}
+
+MongoDal.Errors = {
+  DbError: DbError,
+  DbNotConnectedError: DbNotConnectedError
+};
+
+module.exports = {
+  MongoDal: MongoDal,
+  Errors: MongoDal.Errors
+};
