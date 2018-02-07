@@ -7,6 +7,7 @@ var MongoDal = require('../MongoDal');
 //define variables
 var dal;
 var connString = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority';
+this.logModule = 'JAS RT '
 
 //std out logging settings
 this.logger = new (winston.Logger)({
@@ -15,6 +16,13 @@ this.logger = new (winston.Logger)({
   ]
 });
 this.logger.level = 'silly';
+
+//wrap the log functions with timestamp and module tags
+const levels = ['silly', 'debug', 'info', 'warn', 'error'];
+for(let level = 0; level<levels.length; level++){
+  const fn = this.logger[levels[level]];
+  this.logger[levels[level]] = (str) => fn(`${new Date()} ${this.logModule} ${str}`);
+}
 
 class CallTracker{
 
@@ -92,7 +100,7 @@ class CallTracker{
 };
 
 describe('MongoDal', () => {
-  let logModule = 'JAS DAL';
+  this.logModule = 'JAS DAL';
 
   //test documents
   let testDoc = {
@@ -103,54 +111,52 @@ describe('MongoDal', () => {
     };
 
   beforeAll((done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---beforeAll started---');
+    this.logger.debug(`---beforeAll started---`);
 
     //create MongoDal
     try{
       dal = new MongoDal(connString, 'silly');
     }
     catch(err){
-      this.logger.error(new Date() + ' ' + logModule + ' error creating MongoDal instance: ' + err);
+      this.logger.error(`error creating MongoDal instance: ${err}`);
       fail(err);
       done(); return;
     }
 
     //setup the this.logger
-    dal.init().then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' dal init completed');
-    })
+    dal.init().then(() => this.logger.debug(`dal init completed`))
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error attempting to init MongoDal: ' + err);
+      this.logger.error(`error attempting to init MongoDal: ${err}`);
       fail();
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---beforeAll completed---\n');
+      this.logger.debug(`---beforeAll completed---\n`);
       done();
     });
 
   });
 
   it('inserts one doc', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---inserts one doc---');
+    this.logger.debug(`---inserts one doc---`);
     dal.insertDoc(testDoc).then((id) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' got id: ' + id);
+      this.logger.debug(`got id: ${id}`);
       expect(id instanceof ObjectId).toBe(true);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
+      this.logger.error(`error inserting document: ${err}`);
       fail(err); 
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---inserts one doc---\n');
+      this.logger.debug(`---inserts one doc---\n`);
       done();
     });
   });
 
   it('gets document by id', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---gets document by id---');
+    this.logger.debug(`---gets document by id---`);
     let _id;
     dal.insertDoc(testDoc).then((id) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' inserted doc.');
+      this.logger.debug(`inserted doc.`);
       _id = id;
       return dal.getById(id);
     })
@@ -159,17 +165,17 @@ describe('MongoDal', () => {
       expect(doc.num).toEqual(99);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error inserting document: ' + err);
+      this.logger.error(`error inserting document: ${err}`);
       fail(err); 
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---gets document by id---\n');
+      this.logger.debug(`---gets document by id---\n`);
       done();
     })
   });
 
   it('counts the collection', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---counts the collection---');
+    this.logger.debug(`---counts the collection---`);
     dal.countCol().then((count) => {
       expect(count).toBe(0);
       return Promise.all([dal.insertDoc({test:0}),
@@ -177,147 +183,147 @@ describe('MongoDal', () => {
                           dal.insertDoc({test:2})]);
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' inserted all 3 docs');
+      this.logger.debug(`inserted all 3 docs`);
       return dal.countCol();
     })
     .then((count) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs');
+      this.logger.debug(`counted ${count} docs`);
       expect(count).toBe(3);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error counting the collection: ' + err);
+      this.logger.error(` error counting the collection: ${err}`);
       fail(err); 
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---counts the collection---\n');
+      this.logger.debug(`---counts the collection---\n`);
       done();
     });
   });
 
   it('deletes all docs', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---deletes all docs---');
+    this.logger.debug(`---deletes all docs---`);
     Promise.all([dal.insertDoc({test:0}),
                  dal.insertDoc({test:1}),
                  dal.insertDoc({test:2})])
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' inserted all 3 docs');
+      this.logger.debug(`inserted all 3 docs`);
       return dal.countCol();
     })
     .then((count) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs');
+      this.logger.debug(`counted ${count} docs`);
       expect(count).toBe(3);
       return dal.deleteAllDocs();
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' all docs successfully deleted');
+      this.logger.debug(`all docs successfully deleted`);
       return dal.countCol();
     })
     .then((count) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' counted ' + count + ' docs after delete');
+      this.logger.debug(`counted ${count} docs after delete`);
       expect(count).toBe(0);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error deleting all docs and counting them: ' + err);
+      this.logger.error(`error deleting all docs and counting them: ${err}`);
       fail(err); 
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---deletes all docs---\n');
+      this.logger.debug(`---deletes all docs---\n`);
       done();
     });
   });
 
   it('should retry on network error', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---should retry on error---');
+    this.logger.debug(`---should retry on error---`);
 
     let callTracker = new CallTracker();
-    this.logger.silly(new Date() + ' ' + logModule + ' created callTracker obj');
+    this.logger.silly(`created callTracker obj`);
     spyOn(callTracker, 'netErr').and.callThrough();
 
-    dal._retryOnErr(() => {return callTracker.netErr();}).then((res) => {
+    dal._retryOnErr(() => callTracker.netErr()).then((res) => {
       expect(callTracker.netErr).toHaveBeenCalledTimes(2);
       expect(res).toBe('resolved');
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' problem with _retryOnErr. callTracker called ' + callTracker.called + ' times. Err: ' + err);
+      this.logger.error(`problem with _retryOnErr. callTracker called ${callTracker.called} times. Err: ${err}`);
       fail(err);
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---should retry on network error---\n');
+      this.logger.debug(` ---should retry on network error---\n`);
       done();
     });
   });
 
   it('does not retry on first duplicate key error', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---');
+    this.logger.debug(`---does not retry on first duplicate key error---`);
 
     let callTracker = new CallTracker();
     spyOn(callTracker, 'dupKeyErr').and.callThrough();
-    this.logger.debug(new Date() + ' ' + logModule + ' created call tracker');
+    this.logger.debug(`created call tracker`);
 
     dal._retryOnErr(() => callTracker.dupKeyErr())
     .catch((err) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' caught error' + err);
+      this.logger.debug(`caught error ${err}`);
       expect(err.code).toBe(11000); //expect the duplicate key error
       expect(callTracker.dupKeyErr).toHaveBeenCalledTimes(1);
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---does not retry on first duplicate key error---\n');
+      this.logger.debug(`---does not retry on first duplicate key error---\n`);
       done();
     });
   });
 
   it('retries and eats duplicate key error on insert retry', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---retries and eats duplicate key error on insert retry---');
+    this.logger.debug(`---retries and eats duplicate key error on insert retry---`);
 
     let callTracker = new CallTracker();
     spyOn(callTracker, 'netErrThenDupKey').and.callThrough();
-    this.logger.debug(new Date() + ' ' + logModule + ' created call tracker');
+    this.logger.debug(`created call tracker`);
 
     dal._retryOnErr(() => callTracker.netErrThenDupKey())
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' no error');
+      this.logger.debug(`no error`);
       expect(callTracker.netErrThenDupKey).toHaveBeenCalledTimes(2);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error retrying: ' + err);
+      this.logger.error(`error retrying: ${err}`);
       fail();
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---retries and eats duplicate key error on insert retry---\n');
+      this.logger.debug(`---retries and eats duplicate key error on insert retry---\n`);
       done();
     });
   });
 
   it('increments a counter', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---increments a counter---');
+    this.logger.debug(`---increments a counter---`);
     let doc = {};
     doc.counter = 0;
 
     dal.insertDoc(doc).then((id) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      this.logger.debug(`inserted doc with counter`);
       doc._id = id;
       return dal.incCounter(id);
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' incCounter success');
+      this.logger.debug(`incCounter success`);
       return dal.getById(doc._id);
     })
     .then((doc) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' fetched doc by id');
+      this.logger.debug(`fetched doc by id`);
       expect(doc.counter).toBe(1);
     })
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error testing incCounter: ' + err);
+      this.logger.error(`error testing incCounter: ${err}`);
       fail();
     })
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---increments a counter---\n');
+      this.logger.debug(`---increments a counter---\n`);
       done();
     });
   });
 
   it('doesnt double count after network error', (done) => {
-    this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---');
+    this.logger.debug(`---doesnt double count after network error---`);
     let counterDoc = {};
     counterDoc.counter = 0;
 
@@ -337,11 +343,11 @@ describe('MongoDal', () => {
         });
         this.logger.level = 'silly';
 
-        this.logger.silly(new Date() + ' ' + logModule + ' FakeCol instance created');
+        this.logger.silly(`FakeCol instance created`);
       }
 
       findOneAndUpdate(query, update, options){
-        this.logger.silly(new Date() + ' ' + logModule + ' findOneAndUpdate called');
+        this.logger.silly(`findOneAndUpdate called`);
         return this.callThroughWithNetErr(query, update, options);
       }
 
@@ -353,78 +359,72 @@ describe('MongoDal', () => {
           sockErr.code = 9001;
           
           if(this.called == 1){
-            this.logger.silly(new Date() + ' ' + logModule + ' callThroughWithNetErr called for first time');
+            this.logger.silly(`callThroughWithNetErr called for first time`);
             realCol.findOneAndUpdate(query, update, options).then(() => {
-              this.logger.silly(new Date() + ' ' + logModule + ' rejecting with socket err');
+              this.logger.silly(`rejecting with socket err`);
               reject(sockErr);
             })
             .catch(err => {
-              this.logger.err(new Date() + ' ' + logModule + ' unexpected error' + err);
+              this.logger.err(`unexpected error' ${err}`);
               reject(err);
             });
           }
           else if(this.called == 2){
-            this.logger.silly(new Date() + ' ' + logModule + ' callThroughWithNetErr called for second time, calling again');
+            this.logger.silly(`callThroughWithNetErr called for second time, calling again`);
             let res = realCol.findOneAndUpdate(query, update, options);
             resolve(res);
           }
           else{
-            this.logger.error(new Date() + ' ' + logModule + ' called more than twice');
+            this.logger.error(`called more than twice`);
             reject(new Error('called more than twice'));
           }
         });
       }
     }
 
-    let realCol = dal._database.collection('example');;
+    let realCol = dal._database.collection('data');;
     let fakeCol = new FakeCol(realCol);
 
     dal.insertDoc(counterDoc).then((id) => {
-      this.logger.debug(new Date() + ' ' + logModule + ' inserted doc with counter');
+      this.logger.debug(`inserted doc with counter`);
       counterDoc._id = id;
       
       //replace the collection definition with a mockup
-      dal.dalExample = fakeCol;
+      dal.dalData = fakeCol;
 
       return dal.incCounter(id);
     })
     .then(() => {
       expect(fakeCol.called).toBe(2);
-      this.logger.debug(new Date() + ' ' + logModule + ' this test wrecked the dal instance. Making a new one');
+      this.logger.debug(`this test wrecked the dal instance. Making a new one`);
       dal = new MongoDal(connString, 'silly');
       return dal.init();
     })
     .then(() => {
-      this.logger.silly(new Date() + ' ' + logModule + ' new instance created. Finding document to compare count');
+      this.logger.silly(`new instance created. Finding document to compare count`);
       return dal.getById(counterDoc._id);
     })
-    .then((res) => {
-      expect(res.counter).toBe(1);
-    })
-    .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' err: ' + err);
-    })
+    .then((res) => expect(res.counter).toBe(1))
+    .catch((err) => this.logger.error(`err: ${err}`))
     .then(() => {
-      this.logger.debug(new Date() + ' ' + logModule + ' ---doesnt double count after network error---\n');
+      this.logger.debug(`---doesnt double count after network error---\n`);
       done();
     });
 
   });
 
   afterEach((done) => {
-    this.logger.silly(new Date() + ' ' + logModule + ' ---after each---');
+    this.logger.silly(`---after each---`);
 
     dal.deleteAllDocs()
-    .then((count) => {
-      this.logger.silly(new Date() + ' ' + logModule + ' deleted ' + count  + ' existing docs.');
-    })
+    .then((count) => this.logger.silly(`deleted ${count} existing docs.`))
     .catch((err) => {
-      this.logger.error(new Date() + ' ' + logModule + ' error deleting all docs in afterEach: ' + err);
+      this.logger.error(`error deleting all docs in afterEach: ${err}`);
       fail(err);
       done();
     })
     .then(() => {
-      this.logger.silly(new Date() + ' ' + logModule + ' ---after each---\n');
+      this.logger.silly(`---after each---\n`);
       done();
     });
     
