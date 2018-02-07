@@ -161,7 +161,7 @@ class MongoDal{
         {'_id': id, 'opids': {'$ne': opid}},
         //increment the counter and add the opid for this operation into the opids array
         //slice the oldest elements out of the array if it is too large
-        {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10000}}},
+        {'$inc': {'counter': 1}, '$push': {'opids': {'$each': [opid], '$slice': -10}}},
         //don't bring back the whole document which includes the list of opids
         //only return the new counter value for logging purposes
         {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'}
