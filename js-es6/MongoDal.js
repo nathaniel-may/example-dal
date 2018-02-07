@@ -33,45 +33,33 @@ class MongoDal{
     this.logger.silly(`MongoDal constructor completed`);
   }
 
-  async init(){
-    this.logger.silly(`init function called`);
+  async connect(dbName){
+    if(this._connected){
+      throw new DbAlreadyConnectedError();
+    }
+
+    this.logger.silly(`connect function called`);
     //attempt to connect to the database only once
     try{
-      const db = await this._connect('dal');
-
-      //define database object so that reconnecting is not required
+      this.logger.debug(`attempting mongodb connection with conn string ${this.connString}`);
+      let db = await MongoClient.connect(this.connString);
+      this.logger.debug(`MongoClient success`);
+      db = db.db('nodeDal');
       this._database = db;
 
       //define all necessary collections
       //every document read from this collection will be present on at least a majority of servers
       //but may not be the latest version of the document
       this.dalData = db.collection('data', {readConcern: {level: 'majority'}});
+
       //single documents queried from this collection will be present on at least a majority of servers
       //and be the latest version of that document. this cannot be used for querying multiple documents.
       this.dalDataLin = db.collection('data', {readConcern: {level: 'linearizable'}});
 
-      this.logger.debug(`init function completed`);
+      this._connected = true;
     }
     catch(err){
       this.logger.error(`could not establish a connection to mongod. Check that the database is actually up. Error: ${err}`);
-      throw err;
-    };
-  };
-
-  async _connect(dbName){
-    this.logger.silly(`_connect function called for database ${dbName}`);
-    this.logger.debug(`attempting mongodb connection with conn string ${this.connString}`);
-    //attempt to connect to the replica set
-    try{
-      const db = await MongoClient.connect(this.connString);
-      this.logger.debug(`MongoClient success`);
-      //return the requested database. the database does not need to exist for this to work.
-      const newDb = db.db(dbName);
-      this._connected = true;
-      return newDb;
-    }
-    catch(err){
-      this.logger.error(`_connect failed`);
       throw err;
     };
   }
@@ -230,7 +218,7 @@ class MongoDal{
   //All following arguments are passed to the function when called.
   async _retryOnErr(...args){
     this._assertConnected();
-    
+
     this.logger.silly(`_retryOnErr called`);
     //remove the first arg and store it as fn
     //args now only contains the args to pass to fn
@@ -323,15 +311,23 @@ class DbError extends Error{
 }
 
 class DbNotConnectedError extends DbError{
-  constructor() {
+  constructor(){
     super('function called before database was connected');
     Error.captureStackTrace(this, DbNotConnectedError);
   }
 }
 
+class DbAlreadyConnectedError extends DbError{
+  constructor(){ 
+    super('connect was called more than once');
+    Error.captureStackTrace(this, DbAlreadyConnectedError);
+  }
+}
+
 MongoDal.Errors = {
   DbError: DbError,
-  DbNotConnectedError: DbNotConnectedError
+  DbNotConnectedError: DbNotConnectedError,
+  DbAlreadyConnectedError: DbAlreadyConnectedError
 };
 
 module.exports = {

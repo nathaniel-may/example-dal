@@ -112,25 +112,23 @@ describe('MongoDal', () => {
     };
 
   recreateMongoDal = () => {
-    //create MongoDal
     try{
       this.dal = new MongoDal(connString, 'silly');
     }
     catch(err){
       this.logger.error(`error creating MongoDal instance: ${err}`);
-      fail(err);
-      done(); return;
+      throw err;
     }
   }
 
-  initMongoDal = async () => {
+  connectMongoDal = async () => {
     try{
-      await this.dal.init();
-      this.logger.debug(`dal init completed`);
+      await this.dal.connect();
+      this.logger.debug(`dal connected`);
     }
     catch(err) {
-      this.logger.error(`error attempting to init MongoDal: ${err}`);
-      fail();
+      this.logger.error(`error attempting to connect MongoDal: ${err}`);
+      throw err;
     }
   }
 
@@ -140,7 +138,7 @@ describe('MongoDal', () => {
 
     //create MongoDal
     recreateMongoDal();
-    await initMongoDal();
+    await connectMongoDal();
 
     this.logger.debug(`---beforeAll completed---
                       `);
@@ -402,8 +400,13 @@ describe('MongoDal', () => {
       await this.dal.incCounter(id);
       expect(fakeCol.called).toBe(2);
       this.logger.debug(`this test wrecked the dal instance. Making a new one`);
-      dal = new MongoDal(connString, 'silly');
-      await this.dal.init();
+      try{
+        recreateMongoDal();
+        await connectMongoDal();
+      }
+      catch(err){
+        fail(`failed to recreate dal instance: ${err}`);
+      }
       this.logger.silly(`new instance created. Finding document to compare count`);
       const doc = await this.dal.getById(counterDoc._id);
       expect(doc.counter).toBe(1)
@@ -430,9 +433,30 @@ describe('MongoDal', () => {
     }
 
     //init for cleanup
-    await initMongoDal();
+    try{
+      await connectMongoDal();
+    }
+    catch(err){
+      fail(`failed to reconnect dal instance: ${err}`);
+    }
 
     this.logger.debug(`---throws DbNotConnectedError when not not connected---
+                      `);
+    done();
+  });
+
+  it('throws DbAlreadyConnectedError connect called twice', async done => {
+    this.logger.debug(`---throws DbAlreadyConnectedError connect called twiced---`);
+    try{
+      await connectMongoDal();
+      const id = await this.dal.insertDoc(testDoc);
+      fail('expected DbNotConnectedError');
+    }
+    catch(err){
+      expect(err instanceof MongoDalErrors.DbAlreadyConnectedError)
+    }
+
+    this.logger.debug(`---throws DbAlreadyConnectedError connect called twice---
                       `);
     done();
   });
