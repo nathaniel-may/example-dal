@@ -25,7 +25,7 @@ class MongoDal{
     const levels = ['silly', 'debug', 'info', 'warn', 'error'];
     for(let level = 0; level<levels.length; level++){
       const fn = this.logger[levels[level]];
-      this.logger[levels[level]] = (str) => fn(`${new Date()} ${this.logModule} ${str}`);
+      this.logger[levels[level]] = str => fn(`${new Date()} ${this.logModule} ${str}`);
     }
 
 
@@ -35,7 +35,7 @@ class MongoDal{
   init(){
     this.logger.silly(`init function called`);
     //attempt to connect to the database only once
-    return this._connect('dal').then((db) => {
+    return this._connect('dal').then(db => {
       //define database object so that reconnecting is not required
       this._database = db;
 
@@ -49,7 +49,7 @@ class MongoDal{
 
       this.logger.debug(`init function completed`);
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`could not establish a connection to mongod. Check that the database is actually up. Error: ${err}`);
       throw err;
     });
@@ -59,12 +59,12 @@ class MongoDal{
     this.logger.silly(`_connect function called for database ${dbName}`);
     this.logger.debug(`attempting mongodb connection with conn string ${this.connString}`);
     //attempt to connect to the replica set
-    return MongoClient.connect(this.connString).then((db) => {
+    return MongoClient.connect(this.connString).then(db => {
       this.logger.debug(`MongoClient success`);
       //return the requested database. the database does not need to exist for this to work.
       return db.db(dbName);
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`_connect failed`);
       throw err;
     });
@@ -90,7 +90,7 @@ class MongoDal{
       this.logger.debug(`document successfully inserted`);
       return doc._id;
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`error inserting doc: ${err}`);
       throw err;
     })
@@ -110,11 +110,11 @@ class MongoDal{
                          .next();
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((doc) => {
+    return this._retryOnErr(fn).then(doc => {
       this.logger.debug(`found doc with id ${id}`);
       return doc;
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`error getting by id`);
       throw err;
     });
@@ -128,11 +128,11 @@ class MongoDal{
     const fn = () => this.dalData.find({}).comment('countCol from MongoDal.js').count();
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((count) => {
+    return this._retryOnErr(fn).then(count => {
       this.logger.debug(`collection count is ${count}`);
       return count;
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`error counting collection: ${err}`);
       throw err;
     });
@@ -158,7 +158,7 @@ class MongoDal{
                                  //don't bring back the whole document which includes the list of opids
                                  //only return the new counter value for logging purposes
                                  {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'})
-    .then((updatedDoc) => {
+    .then(updatedDoc => {
       this.logger.silly(`incCounter updated doc`);
       //value will be null when it matches no documents. this will happen when a network error 
       //occurred on the way back from the db before the retry, and the retry doesn't match any documents
@@ -166,12 +166,12 @@ class MongoDal{
         return updatedDoc.value.counter;
       }
     })
-    .catch((err) => {
+    .catch(err => {
       throw err;
     });
 
     //call the function with retry logic
-    return this._retryOnErr(fn).then((count) => {
+    return this._retryOnErr(fn).then(count => {
       if(undefined != count){
         this.logger.debug(`counter incremented to ${count}`);
       }
@@ -183,7 +183,7 @@ class MongoDal{
       //opid will be present in the opids array. the response of the query will be undefined
       //in this instance. to get an accurate value, query the doc byId afterward.
     })
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`error incrementing counter: ${err}`);
       throw err;
     });
@@ -198,7 +198,7 @@ class MongoDal{
 
     //call the function with retry logic
     return this._retryOnErr(fn).then(() => this.logger.debug(`deleted all docs`))
-    .catch((err) => {
+    .catch(err => {
       this.logger.error(`error getting by id`);
       throw err;
     });
@@ -211,23 +211,23 @@ class MongoDal{
     //args now only contains the args to pass to fn
     const fn = args.shift()
     //call the function for the first time
-    return fn.apply(this, args).then((res) => {
+    return fn.apply(this, args).then(res => {
       this.logger.silly(`success on first attempt`);
       //if nothing went wrong, return the response
       return res;
     })
     //the function returned an error on the first call
-    .catch((err) => {
+    .catch(err => {
       //if the error is a network error or an interrupt error it may be able to be resolved by retrying
       if(MongoDal.networkErrors[err.code] != undefined || MongoDal.interruptErrors[err.code] != undefined){
         this.logger.warn(`experienced network error- retrying`);
         //call the function for the second time. The MongoDB driver automatically waits for a 
         //visible primary for no more than 30 seconds.
-        return fn.apply(this, args).then((res) => {
+        return fn.apply(this, args).then(res => {
           this.logger.debug(`retry resolved network error`);
           return res;
         })
-        .catch((err) => {
+        .catch(err => {
           //the only way for a duplicate key error to happen here is if it occured
           //after a retry, and not on the initial call. this means the initial call inserted
           //the document but the response was interrupted, so this error can be ignored
