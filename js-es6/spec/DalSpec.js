@@ -21,7 +21,7 @@ this.logger.level = 'silly';
 const levels = ['silly', 'debug', 'info', 'warn', 'error'];
 for(let level = 0; level<levels.length; level++){
   const fn = this.logger[levels[level]];
-  this.logger[levels[level]] = (str) => fn(`${new Date()} ${this.logModule} ${str}`);
+  this.logger[levels[level]] = str => fn(`${new Date()} ${this.logModule} ${str}`);
 }
 
 class CallTracker{

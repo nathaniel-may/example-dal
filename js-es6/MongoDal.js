@@ -37,6 +37,7 @@ class MongoDal{
     //attempt to connect to the database only once
     try{
       const db = await this._connect('dal');
+
       //define database object so that reconnecting is not required
       this._database = db;
 
@@ -166,7 +167,6 @@ class MongoDal{
         //only return the new counter value for logging purposes
         {'projection': {'counter': 1, '_id':0}, 'returnOriginal': false, 'w':'majority'}
       )
-
       this.logger.silly(`incCounter updated doc`);
       //value will be null when it matches no documents. this will happen when a network error 
       //occurred on the way back from the db before the retry, and the retry doesn't match any documents
