@@ -32,10 +32,11 @@ class MongoDal{
     this.logger.silly(`MongoDal constructor completed`);
   }
 
-  init(){
+  async init(){
     this.logger.silly(`init function called`);
     //attempt to connect to the database only once
-    return this._connect('dal').then((db) => {
+    try{
+      const db = await this._connect('dal');
       //define database object so that reconnecting is not required
       this._database = db;
 
@@ -48,26 +49,27 @@ class MongoDal{
       this.dalDataLin = db.collection('data', {readConcern: {level: 'linearizable'}});
 
       this.logger.debug(`init function completed`);
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`could not establish a connection to mongod. Check that the database is actually up. Error: ${err}`);
       throw err;
-    });
+    };
   };
 
-  _connect(dbName){
+  async _connect(dbName){
     this.logger.silly(`_connect function called for database ${dbName}`);
     this.logger.debug(`attempting mongodb connection with conn string ${this.connString}`);
     //attempt to connect to the replica set
-    return MongoClient.connect(this.connString).then((db) => {
+    try{
+      const db = await MongoClient.connect(this.connString);
       this.logger.debug(`MongoClient success`);
       //return the requested database. the database does not need to exist for this to work.
       return db.db(dbName);
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`_connect failed`);
       throw err;
-    });
+    };
   }
 
   async insertDoc(doc){
