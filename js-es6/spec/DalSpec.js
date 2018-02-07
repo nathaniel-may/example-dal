@@ -77,22 +77,22 @@ class CallTracker{
 
   sockExceptCallThrough(fn){
     this.called++;
-    return new Promise((resolve, reject) => {
-      let err = new MongoError();
-      err.code = 9001;
+    return new Promise(async (resolve, reject) => {
+      let sockErr = new MongoError();
+      sockErr.code = 9001;
 
       if(this.called == 1){
-        fn().then(() => {
-          reject(err);
-        })
-        .catch((err) => {
-          reject();
-        });
+        await fn();
+        reject(sockErr);
       }
       else{
-        //TODO make this one return line
-        fn().then(() => resolve())
-        .catch(() => reject());
+        try{
+          await fn();
+          resolve();
+        }
+        catch(err){
+          reject(err)
+        };
       }
     });
   }
@@ -110,7 +110,7 @@ describe('MongoDal', () => {
       subDoc: {string1: 'str1', str2: 'str2'}
     };
 
-  beforeAll((done) => {
+  beforeAll( async done => {
     this.logger.debug(`---beforeAll started---`);
 
     //create MongoDal
@@ -124,17 +124,18 @@ describe('MongoDal', () => {
     }
 
     //setup the this.logger
-    dal.init().then(() => this.logger.debug(`dal init completed`))
-    .catch((err) => {
+    try{
+      await dal.init();
+      this.logger.debug(`dal init completed`);
+    }
+    catch(err) {
       this.logger.error(`error attempting to init MongoDal: ${err}`);
       fail();
-    })
-    .then(() => {
-      this.logger.debug(`---beforeAll completed---
-                        `);
-      done();
-    });
+    }
 
+    this.logger.debug(`---beforeAll completed---
+                      `);
+    done();
   });
 
   it('inserts one doc', async done => {
@@ -204,7 +205,7 @@ describe('MongoDal', () => {
       //insert and expect 3 documents
       await Promise.all([dal.insertDoc({test:0}),
                    dal.insertDoc({test:1}),
-                   dal.insertDoc({test:2})])
+                   dal.insertDoc({test:2})]);
       this.logger.debug(`inserted all 3 docs`);
       const count1 = await dal.countCol();
       this.logger.debug(`counted ${count1} docs`);
@@ -270,59 +271,54 @@ describe('MongoDal', () => {
     done();
   });
 
-  it('retries and eats duplicate key error on insert retry', (done) => {
+  it('retries and eats duplicate key error on insert retry', async done => {
     this.logger.debug(`---retries and eats duplicate key error on insert retry---`);
 
     let callTracker = new CallTracker();
     spyOn(callTracker, 'netErrThenDupKey').and.callThrough();
     this.logger.debug(`created call tracker`);
 
-    dal._retryOnErr(() => callTracker.netErrThenDupKey())
-    .then(() => {
+    try{
+      await dal._retryOnErr(() => callTracker.netErrThenDupKey());
       this.logger.debug(`no error`);
       expect(callTracker.netErrThenDupKey).toHaveBeenCalledTimes(2);
-    })
-    .catch((err) => {
+    }
+    catch(err){
       this.logger.error(`error retrying: ${err}`);
       fail();
-    })
-    .then(() => {
+    }
+
       this.logger.debug(`---retries and eats duplicate key error on insert retry---
                         `);
       done();
-    });
   });
 
-  it('increments a counter', (done) => {
+  it('increments a counter', async done => {
     this.logger.debug(`---increments a counter---`);
     let doc = {};
     doc.counter = 0;
 
-    dal.insertDoc(doc).then((id) => {
+    try{
+      let id = await dal.insertDoc(doc);
       this.logger.debug(`inserted doc with counter`);
       doc._id = id;
-      return dal.incCounter(id);
-    })
-    .then(() => {
+      await dal.incCounter(id);
       this.logger.debug(`incCounter success`);
-      return dal.getById(doc._id);
-    })
-    .then((doc) => {
+      const updatedDoc = await dal.getById(doc._id);
       this.logger.debug(`fetched doc by id`);
-      expect(doc.counter).toBe(1);
-    })
-    .catch((err) => {
+      expect(updatedDoc.counter).toBe(1);
+    }
+    catch(err){
       this.logger.error(`error testing incCounter: ${err}`);
       fail();
-    })
-    .then(() => {
-      this.logger.debug(`---increments a counter---
+    }
+    
+    this.logger.debug(`---increments a counter---
                         `);
-      done();
-    });
+    done();
   });
 
-  it('doesnt double count after network error', (done) => {
+  it('doesnt double count after network error', async done => {
     this.logger.debug(`---doesnt double count after network error---`);
     let counterDoc = {};
     counterDoc.counter = 0;
@@ -352,7 +348,7 @@ describe('MongoDal', () => {
       }
 
       callThroughWithNetErr(query, update, options){
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
           this.called++;
 
           let sockErr = new MongoError('socketError');
@@ -360,14 +356,15 @@ describe('MongoDal', () => {
           
           if(this.called == 1){
             this.logger.silly(`callThroughWithNetErr called for first time`);
-            realCol.findOneAndUpdate(query, update, options).then(() => {
+            try{
+              await realCol.findOneAndUpdate(query, update, options);
               this.logger.silly(`rejecting with socket err`);
               reject(sockErr);
-            })
-            .catch(err => {
+            }
+            catch(err){
               this.logger.err(`unexpected error' ${err}`);
               reject(err);
-            });
+            };
           }
           else if(this.called == 2){
             this.logger.silly(`callThroughWithNetErr called for second time, calling again`);
@@ -385,51 +382,49 @@ describe('MongoDal', () => {
     let realCol = dal._database.collection('data');;
     let fakeCol = new FakeCol(realCol);
 
-    dal.insertDoc(counterDoc).then((id) => {
+    try{
+      const id = await dal.insertDoc(counterDoc);
       this.logger.debug(`inserted doc with counter`);
       counterDoc._id = id;
       
       //replace the collection definition with a mockup
       dal.dalData = fakeCol;
 
-      return dal.incCounter(id);
-    })
-    .then(() => {
+      await dal.incCounter(id);
       expect(fakeCol.called).toBe(2);
       this.logger.debug(`this test wrecked the dal instance. Making a new one`);
       dal = new MongoDal(connString, 'silly');
-      return dal.init();
-    })
-    .then(() => {
+      await dal.init();
       this.logger.silly(`new instance created. Finding document to compare count`);
-      return dal.getById(counterDoc._id);
-    })
-    .then((res) => expect(res.counter).toBe(1))
-    .catch((err) => this.logger.error(`err: ${err}`))
-    .then(() => {
-      this.logger.debug(`---doesnt double count after network error---
-                        `);
-      done();
-    });
+      const doc = await dal.getById(counterDoc._id);
+      expect(doc.counter).toBe(1)
+    }
+    catch(err){
+      this.logger.error(`err: ${err}`);
+      fail();
+    }
 
+    this.logger.debug(`---doesnt double count after network error---
+                      `);
+    done();
   });
 
-  afterEach((done) => {
+  afterEach( async done => {
     this.logger.silly(`---after each---`);
 
-    dal.deleteAllDocs()
-    .then((count) => this.logger.silly(`deleted ${count} existing docs.`))
-    .catch((err) => {
+    try{
+      const count = await dal.deleteAllDocs();
+      this.logger.silly(`deleted ${count} existing docs.`);
+    }
+    catch(err){
       this.logger.error(`error deleting all docs in afterEach: ${err}`);
       fail(err);
       done();
-    })
-    .then(() => {
-      this.logger.silly(`---after each---
-                        `);
-      done();
-    });
-    
+    }
+
+    this.logger.silly(`---after each---
+                      `);
+    done();
   });
 
 });
