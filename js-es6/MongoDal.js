@@ -106,6 +106,8 @@ class MongoDal{
   };
 
   async getById(id){
+    this._assertConnected();
+
     this.logger.silly(`getById function called with id ${id}`);
 
     //define the funciton to query a document by id and return all fields except the array of opids.
@@ -131,6 +133,8 @@ class MongoDal{
   };
 
   async countCol(){
+    this._assertConnected();
+
     this.logger.silly(`countCol function called`);
 
     //define the function return the collection count. the query comment helps with debugging
@@ -151,6 +155,8 @@ class MongoDal{
 
   //uses pattern for idempotency explained here: explore.mongodb.com/developer/nathaniel-may
   async incCounter(id){
+    this._assertConnected();
+
     this.logger.silly(`incCounter called for doc ${id}`);
 
     //create a unique id to represent this particular increment operation
@@ -201,6 +207,8 @@ class MongoDal{
   }
 
   async deleteAllDocs(){
+    this._assertConnected();
+
     this.logger.silly(`deleteAllDocs called`);
 
     //define the function to delete all documents with write concern majority
@@ -221,6 +229,8 @@ class MongoDal{
   //arguments: first parameter is the function to call which returns a promise. 
   //All following arguments are passed to the function when called.
   async _retryOnErr(...args){
+    this._assertConnected();
+    
     this.logger.silly(`_retryOnErr called`);
     //remove the first arg and store it as fn
     //args now only contains the args to pass to fn
