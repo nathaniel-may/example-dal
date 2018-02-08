@@ -9,7 +9,7 @@ var Winston = require('winston');
 class MongoDal{
 
   constructor(connString, logLevel){
-    this.logModule = 'DAL';
+    this.logModule = 'DAL    ';
     this.connString = connString;
     this._database = null;
     this._connected = false;

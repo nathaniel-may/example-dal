@@ -8,21 +8,23 @@ var MongoDalErrors = require('../MongoDal').Errors;
 //define variables
 var dal;
 var connString = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority';
-this.logModule = 'JAS RT '
 
-//std out logging settings
-this.logger = new (winston.Logger)({
-  transports: [
-    new (winston.transports.Console)({colorize: true})
-  ]
-});
-this.logger.level = 'silly';
+//function to create a logger and wrap the functions with timestamp and module tags
+const newLogger = (module, level) => {
+  const logger = new (winston.Logger)({
+    transports: [
+      new (winston.transports.Console)({level: level, colorize: true})
+    ]
+  });
 
-//wrap the log functions with timestamp and module tags
-const levels = ['silly', 'debug', 'info', 'warn', 'error'];
-for(let level = 0; level<levels.length; level++){
-  const fn = this.logger[levels[level]];
-  this.logger[levels[level]] = str => fn(`${new Date()} ${this.logModule} ${str}`);
+  const levels = ['silly', 'debug', 'info', 'warn', 'error'];
+  for(let level = 0; level<levels.length; level++){
+    const fn = logger[levels[level]];
+    logger[levels[level]] = str => fn(`${new Date()} ${module} ${str}`);
+  }
+
+  return logger;
+
 }
 
 class CallTracker{
@@ -73,7 +75,7 @@ class CallTracker{
       let dupKeyErr = new MongoError('duplicateKeyError');
       dupKeyErr.code = 11000;
       reject(new MongoDalErrors.DbDuplicateIdError('exampleId'));
-    })
+    });
   }
 
   sockExceptCallThrough(fn){
@@ -101,7 +103,8 @@ class CallTracker{
 };
 
 describe('MongoDal', () => {
-  this.logModule = 'JAS DAL';
+
+  this.logger = newLogger('JAS DAL', 'silly');
 
   //test documents
   let testDoc = {
@@ -339,14 +342,7 @@ describe('MongoDal', () => {
       constructor(realCol){      
         this.called = 0;
         this.realCol = realCol;
-
-        //std out logging settings
-        this.logger = new (winston.Logger)({
-          transports: [
-            new (winston.transports.Console)({colorize: true})
-          ]
-        });
-        this.logger.level = 'silly';
+        this.logger = newLogger('JASMOCK', 'silly');
 
         this.logger.silly(`FakeCol instance created`);
       }
