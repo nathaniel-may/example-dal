@@ -428,6 +428,9 @@ describe('MongoDal', () => {
     }
     catch(err){
       expect(err instanceof MongoDalErrors.DbNotConnectedError).toBe(true);
+      if(err instanceof MongoDalErrors.DbNotConnectedError){
+        this.logger.debug(`caught correct error`);
+      }
     }
 
     //init for cleanup
@@ -448,10 +451,13 @@ describe('MongoDal', () => {
     try{
       await connectMongoDal();
       const id = await this.dal.insertDoc(testDoc);
-      fail('expected DbNotConnectedError');
+      fail('expected DbAlreadyConnectedError');
     }
     catch(err){
       expect(err instanceof MongoDalErrors.DbAlreadyConnectedError).toBe(true);
+      if(err instanceof MongoDalErrors.DbAlreadyConnectedError){
+        this.logger.debug(`caught correct error`);
+      }
     }
 
     this.logger.debug(`---throws DbAlreadyConnectedError connect called twice---
