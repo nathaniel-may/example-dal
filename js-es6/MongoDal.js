@@ -59,6 +59,10 @@ class MongoDal{
       this._connected = true;
     }
     catch(err){
+      if(err.code === MongoDal.mongoErrors['AuthenticationFailed']){
+        throw new DbAuthenticationFailedError();
+      }
+
       this.logger.error(`could not establish a connection to mongod. Check that the database is actually up. Error: ${err}`);
       throw err;
     };
@@ -88,6 +92,10 @@ class MongoDal{
       return doc._id;
     }
     catch(err){
+      if(err.code == MongoDal.mongoErrors['duplicate key exception']){
+        this.logger.error(`duplicate key exception with id ${doc._id}`);
+        throw new DbDuplicateIdError(doc._id);
+      }
       this.logger.error(`error inserting doc: ${err}`);
       throw err;
     }
@@ -287,19 +295,24 @@ MongoDal.networkErrors = {
 };
 
 MongoDal.interruptErrors = {
-  11601:'interrupted',
-  11600:'interrupted at shutdown',
-  11602:'interrupted due to repl state change',
-  50:'exceeded time limit',
-  'interrupted':11601,
-  'interrupted at shutdown':11600,
-  'interrupted due to repl state change':11602,
-  'exceeded time limit':50
+  50: 'exceeded time limit',
+  11600: 'interrupted at shutdown',
+  11601: 'interrupted',
+  11602: 'interrupted due to repl state change',
+  'exceeded time limit': 50,
+  'interrupted at shutdown': 11600,
+  'interrupted': 11601,
+  'interrupted due to repl state change': 11602
 };
 
 MongoDal.mongoErrors = {
-  11000:'duplicate key exception',
-  'duplicate key exception':11000
+  18: 'AuthenticationFailed',
+  74: 'NodeNotFound',
+  11000: 'duplicate key exception',
+  'AuthenticationFailed': 18,
+  'NodeNotFound': 74,
+  'duplicate key exception': 11000,
+  
 };
 
 //parent error for all MongoDal errors
@@ -324,10 +337,26 @@ class DbAlreadyConnectedError extends DbError{
   }
 }
 
+class DbAuthenticationFailedError extends DbError{
+  constructor(){ 
+    super('connection refused. are the credentials correct?');
+    Error.captureStackTrace(this, DbConnectionRefusedError);
+  }
+}
+
+class DbDuplicateIdError extends DbError{
+  constructor(id){ 
+    super('document with this id already exists in the collection', id);
+    Error.captureStackTrace(this, DbDuplicateIdError);
+  }
+}
+
 MongoDal.Errors = {
   DbError: DbError,
   DbNotConnectedError: DbNotConnectedError,
-  DbAlreadyConnectedError: DbAlreadyConnectedError
+  DbAlreadyConnectedError: DbAlreadyConnectedError,
+  DbAuthenticationFailedError: DbAuthenticationFailedError,
+  DbDuplicateIdError: DbDuplicateIdError
 };
 
 module.exports = {

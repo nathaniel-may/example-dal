@@ -72,7 +72,7 @@ class CallTracker{
     return new Promise((resolve, reject) => {
       let dupKeyErr = new MongoError('duplicateKeyError');
       dupKeyErr.code = 11000;
-      reject(dupKeyErr);
+      reject(new MongoDalErrors.DbDuplicateIdError('exampleId'));
     })
   }
 
@@ -269,7 +269,9 @@ describe('MongoDal', () => {
     }
     catch(err){
       this.logger.debug(`caught error ${err}`);
-      expect(err.code).toBe(11000); //expect the duplicate key error
+      //since _retryOnErr is being called directly with a mock, 
+      //correct error propagation isn't really being enforced here.
+      expect(err instanceof MongoDalErrors.DbDuplicateIdError).toBe(true);
       expect(callTracker.dupKeyErr).toHaveBeenCalledTimes(1);
     }
 
@@ -429,7 +431,7 @@ describe('MongoDal', () => {
       fail('expected DbNotConnectedError');
     }
     catch(err){
-      expect(err instanceof MongoDalErrors.DbNotConnectedError)
+      expect(err instanceof MongoDalErrors.DbNotConnectedError).toBe(true);
     }
 
     //init for cleanup
@@ -453,7 +455,7 @@ describe('MongoDal', () => {
       fail('expected DbNotConnectedError');
     }
     catch(err){
-      expect(err instanceof MongoDalErrors.DbAlreadyConnectedError)
+      expect(err instanceof MongoDalErrors.DbAlreadyConnectedError).toBe(true);
     }
 
     this.logger.debug(`---throws DbAlreadyConnectedError connect called twice---
