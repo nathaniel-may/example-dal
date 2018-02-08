@@ -11,7 +11,6 @@ class MongoDal{
   constructor(connString, logLevel){
     this.logModule = 'DAL    ';
     this.connString = connString;
-    this._database = null;
     this._connected = false;
 
     // std out logging
@@ -33,7 +32,7 @@ class MongoDal{
     this.logger.silly(`MongoDal constructor completed`);
   }
 
-  async connect(dbName){
+  async connect(){
     if(this._connected){
       throw new DbAlreadyConnectedError();
     }
@@ -42,10 +41,9 @@ class MongoDal{
     //attempt to connect to the database only once
     try{
       this.logger.debug(`attempting mongodb connection with conn string ${this.connString}`);
-      let db = await MongoClient.connect(this.connString);
+      this._mongoClient = await MongoClient.connect(this.connString);
+      const db = await this._mongoClient.db('nodeDal');
       this.logger.debug(`MongoClient success`);
-      db = db.db('nodeDal');
-      this._database = db;
 
       //define all necessary collections
       //every document read from this collection will be present on at least a majority of servers
@@ -220,6 +218,25 @@ class MongoDal{
       this.logger.error(`error getting by id`);
       throw err;
     };
+  }
+
+  async close(){
+    this.logger.silly(`attempting graceful connection close`);
+
+    try{
+      await this._mongoClient.close();
+      this._connected = false;
+    }
+    catch(err){
+      this.logger.warn(`could not gracefully close the connection. attempting to force.`);
+      try{
+        this._mongoClient.close(true);
+        this._connected = false;
+      }
+      catch(err2){
+        this.logger.error(`failed to close connection ${err2}`);
+      }
+    }
   }
 
   //arguments: first parameter is the function to call which returns a promise. 

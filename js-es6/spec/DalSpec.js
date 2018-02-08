@@ -384,7 +384,7 @@ describe('MongoDal', () => {
       }
     }
 
-    let realCol = this.dal._database.collection('data');;
+    let realCol = this.dal.dalData;
     let fakeCol = new FakeCol(realCol);
 
     try{
@@ -465,6 +465,22 @@ describe('MongoDal', () => {
     done();
   });
 
+  it('can reconnect after close', async done => {
+    this.logger.debug(`---can reconnect after close---`);
+    try{
+      await this.dal.close();
+      await this.dal.connect();
+    }
+    catch(err){
+      this.logger.error(`caught error during close + reconnect: ${err}`);
+      fail('expected DbAlreadyConnectedError');
+    }
+
+    this.logger.debug(`---can reconnect after close---
+                      `);
+    done();
+  });
+
   afterEach( async done => {
     this.logger.silly(`---after each---`);
 
@@ -478,6 +494,16 @@ describe('MongoDal', () => {
     }
 
     this.logger.silly(`---after each---
+                      `);
+    done();
+  });
+
+  afterAll( async done => {
+    this.logger.debug(`---afterAll started---`);
+
+    await this.dal.close();
+
+    this.logger.debug(`---afterAll completed---
                       `);
     done();
   });
