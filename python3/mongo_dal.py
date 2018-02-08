@@ -29,9 +29,6 @@ class MongoDal:
 
         # set variables for connecting to mongo
         self.conn_string = conn_string
-        # setting flag for connection assert in later functions
-        # self.connect must be called after init for error handling
-        self.__connected = False
 
         # creating the MongoClient and and collection definitions here
         # because they don't reach out to the database until called
@@ -52,25 +49,6 @@ class MongoDal:
             write_concern=write_concern,
             read_concern=ReadConcern(level='majority'))
 
-        self.logger.debug('completed __init__')
-
-    def connect(self):
-        """ Connects to the database. Raises errors caused by reads with an
-            incorrectly configured connection string. Errors relating to write options
-            such as write concern are only raised when a write is attempted
-            
-            Must be called once before calling any other function
-            
-            Calling twice raises an error
-        """
-
-        # connect to mongodb
-        self.logger.debug('started connect')
-
-        # if this has already been called raise an error
-        if self.__connected:
-            raise DbAlreadyConnectedError()
-
         # test connection and error handle results. won't catch bad write
         # concern option until a write is attempted.
         try:
@@ -80,8 +58,6 @@ class MongoDal:
             # an unavailable cluster
             self.client.server_info()
             
-            # setting flag for connection assert in later functions
-            self.__connected = True
             self.logger.debug('completed connect')
         except ConnectionFailure as e:
             self.logger.fatal(
@@ -92,7 +68,7 @@ class MongoDal:
             self.logger.fatal(
                 'Server selection timeout. Are these servers reachable? {!s}'.format(
                     self.conn_string))
-            raise DatabaseConnectionError(e)
+            raise DbConnectionError(e)
         except PyMongoError as e:
             self.logger.fatal('error connecting: {!s}'.format(e))
             raise DbWrappedError(e)
@@ -100,22 +76,16 @@ class MongoDal:
             self.logger.fatal('error connecting: {!s}'.format(e))
             raise
 
-    def __assert_connected(self):
-        """ Raises DbNotConnectedError if connect has not been called """
-
-        if not self.__connected:
-            raise DbNotConnectedError()
+        self.logger.debug('completed __init__')
 
     def close(self):
         """ Closes the connection to MongoDB.
 
-            Connection can be reinitialized by calling self.connect.
+            Connection cannot be re-established. Create a new instance instead.
         """
 
-        self.__assert_connected()
         try:
             self.client.close()
-            self.__connected = False
             self.logger.debug('client closed')
         except PyMongoError as e:
             self.logger.error('error closing client: {!s}'.format(e))
@@ -130,7 +100,6 @@ class MongoDal:
             Assigns an id to the document if it does not already exist to make it safe to retry
         """
 
-        self.__assert_connected()
         self.logger.debug('started insert_doc')
         # assign an _id app-side so the operation can be safely retried
         if '_id' not in doc:
@@ -162,7 +131,6 @@ class MongoDal:
     def get_by_id(self, id):
         """ Gets a document by id """
 
-        self.__assert_connected()
         self.logger.debug('started get_by_id')
         try:
             doc = self.__retry_on_error(
@@ -186,7 +154,6 @@ class MongoDal:
             Appends ObjectIds to the document in the opids array to achieve idempotency.
         """
 
-        self.__assert_connected()
         self.logger.debug('started incCounter')
         # create a unique id to represent this particular increment operation
         opid = ObjectId()
@@ -224,7 +191,6 @@ class MongoDal:
     def delete_all_docs(self):
         """ Deletes all documents in the collection. Does not drop the collection """
 
-        self.__assert_connected()
         self.logger.debug('started delete_all_docs')
         try:
             self.__retry_on_error(
@@ -277,29 +243,6 @@ class DatabaseError(Exception):
     pass
 
 
-class DbNotConnectedError(DatabaseError):
-    """ Exception raised when a database action has been called but
-        self.connect has not been called which has important error handling
-
-    Attributes:
-        message -- generated explanation of the error
-    """
-
-    def __init__(self):
-        self.message = 'must call connect after init'
-
-
-class DbAlreadyConnectedError(DatabaseError):
-    """ Exception raised when self.connect has been called twice
-
-    Attributes:
-        message -- generated explanation of the error
-    """
-
-    def __init__(self):
-        self.message = 'must call connect only once'
-
-
 class DbConnectionRefusedError(DatabaseError):
     """ Exception raise when connection is refused to mongodb
 
@@ -308,7 +251,21 @@ class DbConnectionRefusedError(DatabaseError):
     """
 
     def __init__(self):
-        self.message = 'connection refused to '.format(self.conn_string)
+        self.message = 'connection refused. are the credentials and replica set name correct?'
+
+
+class DbConnectionError(DatabaseError):
+    """ Exception raised when attempting to insert a document which contains
+       an _id which is already present in the collection
+
+    Attributes:
+        id -- the id which caused the error
+        message -- generated explanation of the error
+    """
+
+    def __init__(self, id):
+        self.id = id
+        self.message = 'connection error. is the database up?'
 
 
 class DbDuplicateIdError(DatabaseError):
