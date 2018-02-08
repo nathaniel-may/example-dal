@@ -1,5 +1,5 @@
 from mongo_dal import MongoDal
-from mongo_dal import DbDuplicateIdError, DbNotConnectedError, DbAlreadyConnectedError
+from mongo_dal import DatabaseError, DbConnectionRefusedError, DbConnectionError, DbDuplicateIdError 
 from bson.objectid import ObjectId
 from datetime import datetime
 import unittest
@@ -19,11 +19,25 @@ class MongoDalTest(unittest.TestCase):
         handler.setFormatter(formatter)
         cls.logger.addHandler(handler)
 
-        # connect to MongoDB
         cls.logger.debug('----------setUpClass----------')
-        cls.dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
-                           logging.DEBUG)
-        cls.dal.connect()
+
+        # connect to MongoDB
+        try:
+            cls.dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
+                               logging.DEBUG)
+        except DbConnectionRefusedError as e:
+            cls.logger.fatal(e)
+            raise
+        except ServerSelectionTimeoutError as e:
+            cls.logger.fatal(e)
+            raise
+        except DatabaseError as e:
+            cls.logger.error(e)
+            raise
+        except Exception as e:
+            cls.logger.error(e)
+            raise
+
         cls.logger.debug('----------setUpClass----------\n')
 
     @classmethod
@@ -34,21 +48,6 @@ class MongoDalTest(unittest.TestCase):
         self.logger.debug('----------tearDown----------')
         self.dal.delete_all_docs()
         self.logger.debug('----------tearDown----------\n')
-
-    def testRaisesDbNotConnectedError(self):
-        self.logger.debug('----------testRaisesDbNotConnectedError----------')
-        local_dal = MongoDal('mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=repl0&w=majority',
-                             logging.DEBUG, logger_name='local_dal')
-        with self.assertRaises(DbNotConnectedError):
-            local_dal.get_by_id('dummy_id')
-        
-        self.logger.debug('----------testRaisesDbNotConnectedError----------\n')
-
-    def testRaisesDbAlreadyConnectedError(self):
-        self.logger.debug('----------testRaisesDbAlreadyConnectedError----------')
-        with self.assertRaises(DbAlreadyConnectedError):
-            self.dal.connect()
-        self.logger.debug('----------testRaisesDbAlreadyConnectedError----------\n')
 
     def testInsertingOneDoc(self):
         self.logger.debug('----------testInsertingOneDoc----------')
